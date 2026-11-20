@@ -83,7 +83,7 @@ async def invoke(service, tool, args, *, identity, run_id=None, id_field=None, t
             db.execute("UPDATE calls SET status='unknown_outcome',error=? WHERE id=?",(type(exc).__name__,cid))
         raise
     error = result.get("error") or (result.get("status") if str(result.get("status","")).lower() in
-            {"error","failed","failure","unauthorized","invalid_request","timeout"} else None)
+            {"error","failed","failure","unauthorized","invalid_request","timeout","interrupted","cancelled","canceled","unavailable"} else None)
     with database(write=True) as db:
         record_receipt(db,cid,result,recovered)
         db.execute("UPDATE calls SET status=?,ended_at=?,file=?,error=? WHERE id=?",
