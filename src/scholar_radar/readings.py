@@ -8,7 +8,7 @@ from .evidence import arxiv_id, claim, resource, revision, span, work
 from .settings import dump, now
 
 QUESTION = ("论文用什么方法解决哪个具体问题？分别说明实际评估任务、对照、一个关键证据和适用条件。"
-            "请给支持判断的原文逐字短引；局部文本未覆盖的事项留空。")
+            "只选1至3个5至15词的连续原文短语，保留原大小写和标点，一字不改，逐句贴合所读片段。局部文本未覆盖的事项留空。")
 
 
 async def read_paper(paper, run_id=None):
@@ -46,8 +46,8 @@ async def read_paper(paper, run_id=None):
         rid=revision(db,wid,url,"paper",upstream,body,version=exact or None,mode=first["mode"],source_call=src)
         for link in re.findall(r'https?://(?:github\.com|huggingface\.co)/[\w.-]+/[\w.-]+',body):
             resource(db,wid,link.rstrip("."),"official_link_candidate","mentioned_in_document")
-    focus={"document_id":doc,"question":QUESTION,"language":"zh","offset":0,"limit_chars":min(64000,len(body))}
-    result=await invoke("analysis","analyze_paper",focus,identity=["question-v1",upstream,first["mode"]],
+    focus={"document_id":doc,"question":QUESTION,"language":"zh","offset":0,"limit_chars":min(11500,len(body))}
+    result=await invoke("analysis","analyze_paper",focus,identity=["question-v2",upstream,first["mode"]],
                         id_field="analysis_id",run_id=run_id)
     if result["document_revision"]!=upstream:
         raise ValueError("分析结果引用了另一份修订")
