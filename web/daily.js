@@ -81,7 +81,13 @@ export async function render(kind = "daily", day = "") {
         esc(review.summary) +
         '</p><div class="row">' +
         (review.readings || [])
-          .map((id, i) => evid(id, "精读 " + (i + 1)))
+          .map((id, i) =>
+            evid(
+              id,
+              (data.evidence || []).find((e) => e.id === id)?.title ||
+                "精读 " + (i + 1),
+            ),
+          )
           .join(" ") +
         "</div></section>"
       : "") +
@@ -93,6 +99,22 @@ export async function render(kind = "daily", day = "") {
             : "当期没有通过证据校验的新变化。已有方向和历史证据可以在方向库查看。",
         ) +
         "</section>") +
+    ((data.watch || []).length
+      ? '<section class="panel"><h3>保持观察</h3>' +
+        list(
+          data.watch.map(
+            (w) =>
+              '<a href="/directions?id=' +
+              encodeURIComponent(w.dir_id) +
+              '">' +
+              esc(w.question) +
+              "</a><details><summary>待补的证据</summary><p>" +
+              esc(w.reason) +
+              "</p></details>",
+          ),
+        ) +
+        "</section>"
+      : "") +
     '</div><aside class="stack"><section class="panel"><h3>来源覆盖</h3>' +
     (sourceStates.length
       ? list(
@@ -104,7 +126,10 @@ export async function render(kind = "daily", day = "") {
               esc(
                 s.status === "ok" || s.status === "success"
                   ? "已取得记录"
-                  : s.reason || s.status,
+                  : s.reason ===
+                      "Some retrieval sources failed; coverage is incomplete."
+                    ? "部分检索来源未完成"
+                    : s.reason || s.status,
               ) +
               "</small>",
           ),
