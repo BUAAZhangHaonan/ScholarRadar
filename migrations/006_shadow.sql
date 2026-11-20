@@ -1,0 +1,1 @@
+CREATE TABLE shadow_choices(proposal_id TEXT NOT NULL REFERENCES proposals(id),evaluation_id TEXT NOT NULL REFERENCES evaluations(id),order_json TEXT NOT NULL,computed_at TEXT NOT NULL,status TEXT NOT NULL,horizon_due TEXT,PRIMARY KEY(proposal_id,evaluation_id));

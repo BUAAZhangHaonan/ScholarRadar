@@ -66,3 +66,7 @@ def proposal(definition:dict):
 def stage(pid:str,state:Literal["reviewed","shadow","active","retired"]):
     with database(write=True) as db: transition(db,pid,state)
     return {"status":state}
+
+@router.get("/api/factors/shadow")
+def shadow_results():
+    with database() as db: return rows(db,"SELECT * FROM shadow_choices ORDER BY computed_at DESC")
