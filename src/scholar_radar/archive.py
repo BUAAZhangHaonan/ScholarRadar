@@ -165,6 +165,12 @@ async def archive_run(run):
     stage = VAR / "staging" / "documents"
     stage.mkdir(parents=True, exist_ok=True)
     with database() as db:
+        archived = {
+            row[0]
+            for row in db.execute(
+                "SELECT remote_path FROM archives WHERE status='archived'"
+            )
+        }
         docs = rows(
             db,
             "SELECT v.id,v.body,v.version,d.url,d.kind FROM revisions v JOIN documents d ON d.id=v.document_id",
@@ -184,6 +190,8 @@ async def archive_run(run):
         for d in docs:
             if d["kind"] == "paper" and d["version"] and "/abs/" in d["url"]:
                 vid = d["url"].split("/abs/")[-1] + d["version"]
+                if "papers/" + vid.replace("/", "_") + ".pdf" in archived:
+                    continue
                 local = await conn.fetchval(
                     "SELECT local_path FROM pdf_assets WHERE versioned_id=$1 AND source='remote' AND local_path IS NOT NULL LIMIT 1",
                     vid,
@@ -195,6 +203,24 @@ async def archive_run(run):
     objects = []
     for d in docs:
         file = stage / (d["id"] + ".txt")
+        rel = "documents/" + file.name
+        if rel in archived:
+            continue
+        bound = int(deployment().get("staging_limit_bytes", 2147483648))
+        size = len(d["body"].encode())
+        occupied = sum(f.stat().st_size for f in stage.iterdir() if f.is_file())
+        if occupied + size > bound:
+            with database(write=True) as local:
+                local.execute(
+                    "INSERT OR REPLACE INTO archives VALUES(?,?,?,'pending',?,NULL)",
+                    (
+                        key("archive", rel),
+                        str(file),
+                        rel,
+                        "本地暂存限额，归档就绪后由固定文档修订重新生成",
+                    ),
+                )
+            raise ArchiveUnavailable("本地暂存到达配置限额")
         atomic_text(file, d["body"])
         objects.append((file, "documents/" + file.name))
     objects.extend(
@@ -228,4 +254,20 @@ async def archive_run(run):
         if path.parent == stage:
             path.unlink(missing_ok=True)
     snap = await asyncio.to_thread(backup, edition)
+    keep = int(deployment().get("local_backup_count", 7))
+    with database() as db:
+        retained = {
+            a[0]
+            for a in db.execute(
+                "SELECT local_path FROM archives WHERE remote_path LIKE 'backups/%' AND status='archived'"
+            )
+        }
+    backups = sorted(
+        (VAR / "backups").glob("*.sqlite"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for historic in backups[max(1, keep) :]:
+        if str(historic) in retained:
+            historic.unlink(missing_ok=True)
     return {"objects": len(objects), "pdfs": len(pdfs), "backup": snap}
