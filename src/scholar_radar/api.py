@@ -65,6 +65,8 @@ def direction(did:str):
         row=one(db,"SELECT * FROM directions WHERE id=?",(did,))
         snapshots=rows(db,"SELECT * FROM snapshots WHERE dir_id=? ORDER BY generated_at DESC",(did,))
         for s in snapshots:
+            verdict=db.execute("SELECT verdict,reason FROM assessment_reviews WHERE snapshot_id=?",(s["id"],)).fetchone()
+            s["review"]=dict(verdict) if verdict else {"verdict":"pending","reason":"待复核"}
             s["body"]=json.loads(s["body"]); s["factors"]=rows(db,"SELECT * FROM factor_values WHERE snapshot_id=?",(s["id"],))
             for f in s["factors"]:
                 f["value"]=json.loads(f["value"]) if f["value"] else None

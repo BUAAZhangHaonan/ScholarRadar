@@ -58,6 +58,10 @@ def markdown(report):
                      "**下一步**　"+card["action"]["title"],""])
     if not report["directions"]:
         text.extend(["分析尚有未完成项，请结合来源覆盖查看。" if report.get("issues") else "当期没有通过证据校验的新方向变化。",""])
+    if report.get("watch"):
+        text.extend(["## 保持观察",""])
+        for item in report["watch"]: text.append("- "+item["question"]+"　"+item["reason"])
+        text.append("")
     for e in report["evidence"]: text.append(f"- [{e['title'] or '官方岗位'} · 第 {e['line_start']} 行]({e['url']})　`{e['id']}`")
     text.extend(["","## 来源与用量",""])
     for src in report["coverage"]["sources"]: text.append(f"- {src['source']}　{src['status']}　{src['reason'] or ''}")
@@ -97,8 +101,16 @@ async def publish(run):
         feedback=rows(db,"SELECT dimension,value,count(*) count FROM feedback GROUP BY dimension,value")
     with database() as db:
         issues=rows(db,"SELECT stage,outcome FROM jobs WHERE run_id=? AND status='failed' ORDER BY stage,id",(rid,))
-    report={**obj,"kind":kind,"date":str(day),"issues":issues}
-    report["snapshot_id"]=key(obj["snapshot_id"],issues,obj["coverage"])
+    with database() as db:
+        cutoff=run["as_of"] if kind=="daily" else str(end)
+        low=run["as_of"] if kind=="daily" else str(start)
+        pending=rows(db,"""SELECT s.id,s.dir_id,d.question,a.reason FROM snapshots s JOIN runs r ON r.id=s.run_id
+              JOIN directions d ON d.id=s.dir_id JOIN assessment_reviews a ON a.snapshot_id=s.id
+              WHERE r.as_of BETWEEN ? AND ? AND a.verdict='needs_evidence' AND s.id=(SELECT s2.id FROM snapshots s2
+              JOIN runs r2 ON r2.id=s2.run_id WHERE s2.dir_id=s.dir_id AND r2.as_of<=?
+              ORDER BY s2.generated_at DESC,s2.rowid DESC LIMIT 1) ORDER BY d.id LIMIT 3""",(low,cutoff,cutoff))
+    report={**obj,"kind":kind,"date":str(day),"issues":issues,"watch":pending}
+    report["snapshot_id"]=key(obj["snapshot_id"],issues,obj["coverage"],pending)
     with database() as db:
         saved=db.execute("SELECT body FROM report_versions WHERE id=?",(report["snapshot_id"],)).fetchone()
     if saved:
@@ -110,7 +122,11 @@ async def publish(run):
             "没有实际反馈时保留待评价，不能预测录用、收益或岗位结果。",
             {"cards":cards,"actions":obj["proposed_actions"],"feedback":feedback,"period":kind},rid,max_tokens=2200)
         allowed={e["id"] for e in obj["evidence"]}
-        review["readings"]=[i for i in review.get("readings",[]) if i in allowed][:prof["weekly_readings"]]
+        works={e["id"]:e["work_id"] for e in obj["evidence"] if e.get("work_id")}
+        unique={}
+        for eid in review.get("readings",[]):
+            if eid in allowed and eid in works: unique.setdefault(works[eid],eid)
+        review["readings"]=list(unique.values())[:prof["weekly_readings"]]
         if (review.get("proposal") or {}).get("action_id") not in {x["id"] for x in obj["proposed_actions"]}: review["proposal"]=None
         report["review"]=review
     with database(write=True) as db:
