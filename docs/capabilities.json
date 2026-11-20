@@ -1,0 +1,677 @@
+{
+  "observed_at": "2026-11-20T16:25:08+00:00",
+  "services": {
+    "trace": {
+      "status": "ok",
+      "transport": "sse",
+      "version": "1.27.0",
+      "protocol": "2025-11-25",
+      "tools": [
+        {
+          "name": "query",
+          "inputSchema": {
+            "properties": {
+              "theme_document": {
+                "title": "Theme Document",
+                "type": "string"
+              },
+              "final_limit": {
+                "default": 20,
+                "title": "Final Limit",
+                "type": "integer"
+              },
+              "agent_candidate_limit": {
+                "default": 150,
+                "title": "Agent Candidate Limit",
+                "type": "integer"
+              },
+              "coarse_pool_limit": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Coarse Pool Limit"
+              },
+              "include_rationale": {
+                "default": true,
+                "title": "Include Rationale",
+                "type": "boolean"
+              },
+              "request_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Request Id"
+              }
+            },
+            "required": [
+              "theme_document"
+            ],
+            "title": "queryArguments",
+            "type": "object"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "title": "queryOutput",
+            "type": "object"
+          },
+          "observed_response_keys": [
+            "brief_preserved_for_selection",
+            "cost",
+            "diagnostics",
+            "errors",
+            "papers",
+            "parsed_queries",
+            "request_id",
+            "selection_origin",
+            "status",
+            "theme_id",
+            "total_after_dedup",
+            "total_after_first_stage",
+            "total_agent_candidates",
+            "total_final",
+            "total_retrieved"
+          ],
+          "observed_business_status": "partial"
+        },
+        {
+          "name": "read",
+          "inputSchema": {
+            "properties": {
+              "paper_id": {
+                "title": "Paper Id",
+                "type": "string"
+              },
+              "depth": {
+                "default": "summary",
+                "title": "Depth",
+                "type": "string"
+              },
+              "allow_acquire": {
+                "default": false,
+                "title": "Allow Acquire",
+                "type": "boolean"
+              },
+              "offset": {
+                "default": 0,
+                "title": "Offset",
+                "type": "integer"
+              },
+              "limit_chars": {
+                "default": 24000,
+                "title": "Limit Chars",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "paper_id"
+            ],
+            "title": "readArguments",
+            "type": "object"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "title": "readOutput",
+            "type": "object"
+          }
+        }
+      ],
+      "authentication": "server-side named headers"
+    },
+    "analysis": {
+      "status": "ok",
+      "transport": "sse",
+      "version": "1.27.1",
+      "protocol": "2025-11-25",
+      "tools": [
+        {
+          "name": "get_paper_text",
+          "inputSchema": {
+            "properties": {
+              "query": {
+                "default": "",
+                "title": "Query",
+                "type": "string"
+              },
+              "include_images": {
+                "default": false,
+                "title": "Include Images",
+                "type": "boolean"
+              },
+              "pdf_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Pdf Url"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Document Id"
+              },
+              "offset": {
+                "default": 0,
+                "title": "Offset",
+                "type": "integer"
+              },
+              "limit_chars": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Limit Chars"
+              },
+              "find_text": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Find Text"
+              },
+              "lang": {
+                "default": "",
+                "title": "Lang",
+                "type": "string"
+              },
+              "refresh": {
+                "default": false,
+                "title": "Refresh",
+                "type": "boolean"
+              }
+            },
+            "title": "get_paper_textArguments",
+            "type": "object"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "title": "get_paper_textOutput",
+            "type": "object"
+          },
+          "observed_response_keys": [
+            "cache_hit",
+            "cost",
+            "coverage",
+            "document_id",
+            "document_revision",
+            "eof",
+            "image_capability",
+            "line_range",
+            "locator_basis",
+            "markdown",
+            "match_status",
+            "matches",
+            "mode",
+            "next_offset",
+            "no_match",
+            "page_numbers_available",
+            "paper",
+            "parse_coverage",
+            "range",
+            "request_id",
+            "search_range",
+            "sections",
+            "source",
+            "status",
+            "timing",
+            "total_chars",
+            "truncated"
+          ],
+          "observed_business_status": "success"
+        },
+        {
+          "name": "analyze_paper",
+          "inputSchema": {
+            "properties": {
+              "query": {
+                "default": "",
+                "title": "Query",
+                "type": "string"
+              },
+              "question": {
+                "default": "",
+                "title": "Question",
+                "type": "string"
+              },
+              "language": {
+                "default": "en",
+                "title": "Language",
+                "type": "string"
+              },
+              "include_images": {
+                "default": false,
+                "title": "Include Images",
+                "type": "boolean"
+              },
+              "pdf_url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Pdf Url"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Document Id"
+              },
+              "lang": {
+                "default": "",
+                "title": "Lang",
+                "type": "string"
+              },
+              "offset": {
+                "default": 0,
+                "title": "Offset",
+                "type": "integer"
+              },
+              "limit_chars": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Limit Chars"
+              },
+              "analysis_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Analysis Id"
+              }
+            },
+            "title": "analyze_paperArguments",
+            "type": "object"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "title": "analyze_paperOutput",
+            "type": "object"
+          },
+          "observed_response_keys": [
+            "analysis",
+            "analysis_id",
+            "analysis_reused",
+            "cache_hit",
+            "cost",
+            "document_id",
+            "document_revision",
+            "image_capability",
+            "original_cost",
+            "paper",
+            "request_id",
+            "source",
+            "status",
+            "timing"
+          ],
+          "observed_business_status": "success"
+        }
+      ],
+      "authentication": "server-side named headers"
+    },
+    "web": {
+      "status": "ok",
+      "transport": "sse",
+      "version": "",
+      "protocol": "2025-11-25",
+      "tools": [
+        {
+          "name": "web_search",
+          "inputSchema": {
+            "properties": {
+              "query": {
+                "title": "Query",
+                "type": "string"
+              },
+              "max_results": {
+                "default": 10,
+                "title": "Max Results",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "type": "object",
+            "title": "web_search_toolArguments"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object",
+            "title": "web_search_toolOutput"
+          },
+          "observed_response_keys": [
+            "cost",
+            "count",
+            "elapsed_s",
+            "engine_errors",
+            "query",
+            "results",
+            "source_status",
+            "spam_examples",
+            "spam_filtered",
+            "variants"
+          ],
+          "observed_business_status": "returned"
+        },
+        {
+          "name": "fetch_page",
+          "inputSchema": {
+            "properties": {
+              "url": {
+                "title": "Url",
+                "type": "string"
+              },
+              "max_chars": {
+                "default": 4000,
+                "title": "Max Chars",
+                "type": "integer"
+              },
+              "offset": {
+                "default": 0,
+                "title": "Offset",
+                "type": "integer"
+              },
+              "refresh": {
+                "default": false,
+                "title": "Refresh",
+                "type": "boolean"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Version"
+              }
+            },
+            "required": [
+              "url"
+            ],
+            "type": "object",
+            "title": "fetch_page_toolArguments"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object",
+            "title": "fetch_page_toolOutput"
+          },
+          "observed_response_keys": [
+            "content_type",
+            "cost",
+            "document_type",
+            "eof",
+            "extractor",
+            "final_url",
+            "next_offset",
+            "offset",
+            "requested_url",
+            "resource",
+            "resource_id",
+            "retrieval_status",
+            "returned_chars",
+            "text",
+            "title",
+            "total_chars",
+            "url",
+            "version"
+          ],
+          "observed_business_status": "extracted_text"
+        },
+        {
+          "name": "research",
+          "inputSchema": {
+            "properties": {
+              "query": {
+                "title": "Query",
+                "type": "string"
+              },
+              "max_results": {
+                "default": 8,
+                "title": "Max Results",
+                "type": "integer"
+              },
+              "fetch_top": {
+                "default": 5,
+                "title": "Fetch Top",
+                "type": "integer"
+              },
+              "excerpt_chars": {
+                "default": 1200,
+                "title": "Excerpt Chars",
+                "type": "integer"
+              },
+              "use_rerank": {
+                "default": true,
+                "title": "Use Rerank",
+                "type": "boolean"
+              },
+              "use_llm": {
+                "default": true,
+                "title": "Use Llm",
+                "type": "boolean"
+              },
+              "query_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Query Id"
+              }
+            },
+            "required": [
+              "query"
+            ],
+            "type": "object",
+            "title": "research_toolArguments"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object",
+            "title": "research_toolOutput"
+          }
+        },
+        {
+          "name": "list_resources",
+          "inputSchema": {
+            "properties": {
+              "limit": {
+                "default": 20,
+                "title": "Limit",
+                "type": "integer"
+              }
+            },
+            "type": "object",
+            "title": "list_resources_toolArguments"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object",
+            "title": "list_resources_toolOutput"
+          }
+        },
+        {
+          "name": "get_resource",
+          "inputSchema": {
+            "properties": {
+              "resource_id": {
+                "title": "Resource Id",
+                "type": "string"
+              },
+              "max_chars": {
+                "default": 4000,
+                "title": "Max Chars",
+                "type": "integer"
+              },
+              "offset": {
+                "default": 0,
+                "title": "Offset",
+                "type": "integer"
+              },
+              "version": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Version"
+              }
+            },
+            "required": [
+              "resource_id"
+            ],
+            "type": "object",
+            "title": "get_resource_toolArguments"
+          },
+          "outputSchema": {
+            "properties": {
+              "result": {
+                "title": "Result",
+                "type": "string"
+              }
+            },
+            "required": [
+              "result"
+            ],
+            "type": "object",
+            "title": "get_resource_toolOutput"
+          }
+        }
+      ],
+      "authentication": "server-side named headers"
+    }
+  }
+}
