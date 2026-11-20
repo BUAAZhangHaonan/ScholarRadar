@@ -6,6 +6,7 @@ from .db import database,key,rows
 from .evidence import claim
 from .factors import activity,put_values
 from .models import ask
+from .source_labels import label_inputs
 from .profile import get_profile
 from .settings import ROOT,dump,now
 
@@ -41,6 +42,10 @@ def packet(db,run):
 
 
 def validate_card(card,papers,jobs):
+    neighbor=card.get("nearest")
+    if isinstance(neighbor,dict):
+        if neighbor.get("work_id") not in papers: raise ValueError("最近邻作品不在输入集合")
+        card["nearest"]="　".join(str(neighbor[k]) for k in ("title","similarity","difference") if neighbor.get(k))
     for field in ("title","judgment","change","nearest","question","method","setting"):
         if not isinstance(card.get(field),str) or not card[field].strip(): raise ValueError("方向卡缺少 "+field)
     works=list(dict.fromkeys(card.get("work_ids",[])))
@@ -84,11 +89,13 @@ async def assess(run):
     all_ids={eid for p in papers.values() for eid in p["quotes"]}|{j["id"] for j in jobs}
     if not papers or (previous and not all_ids-past): return {"snapshots":[],"reason":"没有新的有效证据"}
     instruction=(ROOT/"prompts/direction-assessment.txt").read_text()
-    data=await ask("synthesis",profile["strong_model"],instruction,{"papers":list(papers.values()),"jobs":jobs,
+    paper_input,job_input,restore_ids=label_inputs(papers,jobs)
+    data=await ask("synthesis",profile["strong_model"],instruction,{"papers":paper_input,"jobs":job_input,
         "directions":dirs,"previous":previous,"as_of":run["as_of"],"assets":profile["assets"],
         "compute":profile["compute"],"goals":profile["goals"],"weeks":profile["validation_weeks"]},run["id"],max_tokens=8500)
     saved=[];rejected=[]
-    for card in data.get("cards",[])[:profile["daily_limit"]]:
+    for raw_card in data.get("cards",[])[:profile["daily_limit"]]:
+        card=restore_ids(raw_card)
         try:
             ids,works=validate_card(card,papers,jobs)
             with database(write=True) as db:
