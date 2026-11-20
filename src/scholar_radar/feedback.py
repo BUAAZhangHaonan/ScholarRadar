@@ -39,7 +39,8 @@ def feedback(db,entity_type,entity_id,dimension,value,reason,request_id):
 def comparison(db):
     r=db.execute("SELECT * FROM evaluations ORDER BY as_of DESC,rowid DESC LIMIT 1").fetchone()
     if not r: return []
-    diff=set(json.loads(r["baseline"]))^set(json.loads(r["selected"]))
+    from .shadow import disagreements
+    diff=disagreements(db,r)
     result=[]
     for wid in sorted(diff,key=lambda x:key(r["id"],x)):
         seen=db.execute("SELECT 1 FROM feedback WHERE entity_type='work' AND entity_id=? AND dimension='comparison'",(wid,)).fetchone()

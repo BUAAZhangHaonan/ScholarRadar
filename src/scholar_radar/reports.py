@@ -68,14 +68,17 @@ def markdown(report):
 
 async def publish(run):
     rid=run["id"]; kind=run["kind"]; day=date.fromisoformat(run["as_of"])
+    from .shadow import refresh
+    with database(write=True) as state: refresh(state,rid if kind=="daily" else None)
     with database() as db:
         prof=get_profile(db,run["profile_id"])
         if kind=="daily":
             selected=rows(db,"SELECT * FROM snapshots WHERE run_id=? ORDER BY generated_at,rowid",(rid,))
         else:
-            start=day-timedelta(days=6 if kind=="weekly" else 30)
+            end=day if kind=="weekly" else day.replace(day=1)-timedelta(days=1)
+            start=end-timedelta(days=6) if kind=="weekly" else end.replace(day=1)
             selected=rows(db,"""SELECT s.* FROM snapshots s JOIN runs r ON r.id=s.run_id WHERE r.as_of BETWEEN ? AND ?
-                                ORDER BY s.generated_at DESC""",(str(start),str(day)))
+                                ORDER BY s.generated_at DESC""",(str(start),str(end)))
         cards=[]; seen=set()
         for s in selected:
             if s["dir_id"] in seen: continue
@@ -86,8 +89,9 @@ async def publish(run):
         obj=export(db,rid,cards)
         if kind!="daily":
             obj["coverage"]["sources"]=rows(db,"""SELECT DISTINCT c.source,c.flow,c.status,c.reason FROM coverage c
-                JOIN runs r ON r.id=c.run_id WHERE r.as_of BETWEEN ? AND ?""",(str(start),str(day)))
+                JOIN runs r ON r.id=c.run_id WHERE r.as_of BETWEEN ? AND ?""",(str(start),str(end)))
             obj["coverage"]["window_start"]=str(start)
+            obj["coverage"]["window_end"]=str(end)
         actions=rows(db,"SELECT title,kind,status FROM actions ORDER BY created_at DESC LIMIT 20")
         feedback=rows(db,"SELECT dimension,value,count(*) count FROM feedback GROUP BY dimension,value")
     with database() as db:

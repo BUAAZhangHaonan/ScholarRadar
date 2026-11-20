@@ -64,7 +64,13 @@ def proposal(definition:dict):
 
 @router.post("/api/factors/proposals/{pid}/{state}")
 def stage(pid:str,state:Literal["reviewed","shadow","active","retired"]):
-    with database(write=True) as db: transition(db,pid,state)
+    from .shadow import refresh,RULES
+    with database(write=True) as db:
+        if state in ("shadow","active"):
+            row=db.execute("SELECT definition FROM proposals WHERE id=?",(pid,)).fetchone()
+            if not row or json.loads(row[0]).get("method") not in RULES: raise ValueError("先注册可执行的因子规则")
+        transition(db,pid,state)
+        if state in ("shadow","active"): refresh(db)
     return {"status":state}
 
 @router.get("/api/factors/shadow")
