@@ -1,0 +1,20 @@
+[Unit]
+Description=ScholarRadar worker
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/zhanghaonan/ScholarRadar
+ExecStart=%h/zhanghaonan/ScholarRadar/.venv/bin/scholar-radar worker
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONUNBUFFERED=1
+Environment=TMPDIR=%h/zhanghaonan/ScholarRadar/var/staging
+UMask=0077
+Restart=on-failure
+RestartSec=8
+TimeoutStopSec=30
+StandardOutput=append:%h/zhanghaonan/ScholarRadar/var/worker.log
+StandardError=inherit
+
+[Install]
+WantedBy=default.target
