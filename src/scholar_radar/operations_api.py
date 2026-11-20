@@ -80,3 +80,16 @@ def internprep_export():
 def resume_run(rid:str):
     from .queue import resume
     with database(write=True) as db: return {"run_id":rid,"queued_stages":resume(db,rid)}
+
+@router.get("/api/replay")
+def as_of(cutoff:str):
+    from .replay import replay
+    with database() as db: return replay(db,cutoff)
+
+
+@router.get("/api/evaluation")
+def evaluation():
+    from .replay import forward
+    with database() as db:
+        today=datetime.now(ZoneInfo(get_profile(db)["timezone"])).date()
+        return forward(db,str(today))
