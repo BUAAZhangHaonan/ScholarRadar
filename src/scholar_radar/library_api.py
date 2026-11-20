@@ -124,3 +124,49 @@ def posting_detail(pid: str):
         for h in hist:
             h["details"] = json.loads(h["details"])
         return {**dict(r), "observations": hist}
+
+
+@router.post("/api/works/{wid}/read-section/{focus}", status_code=202)
+def read_section(wid: str, focus: str):
+    from .queue import job
+    from .readings import passage
+
+    if focus not in {"method", "evaluation", "limits"}:
+        raise ValueError("未知章节类型")
+    with database(write=True) as db:
+        row = db.execute(
+            """SELECT l.run_id,l.work_key,v.id revision_id,v.body FROM readings l JOIN revisions v
+          ON v.id=json_extract(l.outcome,'$.revision_id') WHERE json_extract(l.outcome,'$.work_id')=?
+          AND l.status='done' ORDER BY l.rowid DESC LIMIT 1""",
+            (wid,),
+        ).fetchone()
+        if not row:
+            raise ValueError("当前作品尚无完成的固定版本精读")
+        start, size, heading = passage(row["body"], focus)
+        if not heading:
+            raise ValueError("已解析全文没有匹配的章节标题")
+        existing = db.total_changes
+        jid = job(
+            db,
+            row["run_id"],
+            "read",
+            {"key": row["work_key"], "focus": focus, "revision_id": row["revision_id"]},
+        )
+        reused = db.total_changes == existing
+        if not reused:
+            db.execute(
+                "UPDATE runs SET status='queued',ended_at=NULL WHERE id=?",
+                (row["run_id"],),
+            )
+            db.execute(
+                "UPDATE jobs SET status='queued' WHERE stage='archive' AND run_id=?",
+                (row["run_id"],),
+            )
+        return {
+            "job_id": jid,
+            "run_id": row["run_id"],
+            "heading": heading,
+            "start": start,
+            "end": start + size,
+            "reused": reused,
+        }

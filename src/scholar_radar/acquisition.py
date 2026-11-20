@@ -235,6 +235,8 @@ async def reading(run, payload):
                 "SELECT paper FROM readings WHERE run_id=? AND work_key=?", (rid, wk)
             ).fetchone()[0]
         )
+    if payload.get("focus"):
+        return await read_paper({**p, "evidence_focus": payload["focus"]}, rid)
     try:
         result = await read_paper(p, rid)
     except Exception as exc:
