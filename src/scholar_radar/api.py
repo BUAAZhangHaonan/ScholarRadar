@@ -71,3 +71,6 @@ def direction(did:str):
                 f["evidence_ids"]=json.loads(f["evidence_ids"])
         return {**row,"snapshots":snapshots,"relations":rows(db,"SELECT * FROM direction_relations WHERE from_id=? OR to_id=?",(did,did)),
                 "history_names":rows(db,"SELECT name,at FROM direction_names WHERE direction_id=?",(did,))}
+
+from .library_api import router as library_router
+app.include_router(library_router)
