@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from pathlib import Path
 
 from . import mcp_client
@@ -53,7 +54,12 @@ async def invoke(service, tool, args, *, identity, run_id=None, id_field=None, t
         if row and row["status"]=="done":
             return json.loads(Path(row["file"]).read_text())
         if row and row["status"]=="failed":
-            raise CallUnavailable(row["error"] or "上游业务失败")
+            transient = bool(re.search(r"\b(429|502|503|504)\b", row["error"] or ""))
+            previous = list(result_path.parent.glob(cid+".failed-*.json"))
+            if not (safe and transient and len(previous)<2):
+                raise CallUnavailable(row["error"] or "上游业务失败")
+            if result_path.exists():
+                result_path.replace(result_path.with_name(cid+f".failed-{len(previous)+1}.json"))
         recovered = bool(row and row["status"] in ("sent","unknown_outcome"))
         if recovered and not (id_field or safe or result_path.exists()):
             raise CallUnavailable("上游结果尚未确认，保留原请求")
