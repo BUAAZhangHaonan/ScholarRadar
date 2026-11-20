@@ -194,7 +194,7 @@ async def screen(run):
                 (rid, wk, dump(p)),
             )
             job(db, rid, "read", {"key": wk})
-        fixed = [p["work_id"] for p in items]
+        fixed = [p["work_id"] for p in candidates]
         base = [
             p["work_id"]
             for p in sorted(
@@ -295,4 +295,13 @@ async def complete_cold_batch(run):
                 (rid, wk, dump(p)),
             )
             job(db, rid, "read", {"key": wk})
+        selected = [
+            json.loads(r[0])["work_id"]
+            for r in db.execute(
+                "SELECT paper FROM readings WHERE run_id=? ORDER BY rowid", (rid,)
+            )
+        ]
+        db.execute(
+            "UPDATE evaluations SET selected=? WHERE run_id=?", (dump(selected), rid)
+        )
     return {"additional": len(chosen), "reason": "补足缺少固定原文的核心研究问题"}
