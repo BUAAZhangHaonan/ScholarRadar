@@ -58,11 +58,35 @@ def packet(db, run):
         )
     jobs = rows(
         db,
-        """SELECT e.id,e.quote,p.title,p.url,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
+        """SELECT e.id,e.quote,p.title,p.url,p.organization_id,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
         JOIN evidence e ON e.revision_id=o.revision_id WHERE o.status='advertised'
         AND o.verified_at=(SELECT max(o2.verified_at) FROM posting_observations o2 WHERE o2.posting_id=p.id)
         ORDER BY e.start LIMIT 14""",
     )
+    prefs = get_profile(db, run["profile_id"])
+    excluded = {
+        v.strip().casefold()
+        for v in prefs["deferred_companies"] + prefs["excluded_companies"]
+    }
+    targets = {v.strip().casefold() for v in prefs["target_companies"]}
+    eligible = []
+    for j in jobs:
+        aliases = [
+            r[0].casefold()
+            for r in db.execute(
+                """SELECT a.alias FROM aliases a WHERE a.organization_id=? OR a.organization_id=
+            (SELECT parent_id FROM organizations WHERE id=?) UNION SELECT name FROM organizations WHERE id=?""",
+                (j["organization_id"], j["organization_id"], j["organization_id"]),
+            )
+        ]
+        if (
+            not aliases
+            or excluded.intersection(aliases)
+            or (targets and not targets.intersection(aliases))
+        ):
+            continue
+        eligible.append(j)
+    jobs = eligible
     previous = {}
     for r in db.execute(
         "SELECT s.dir_id,s.id,s.body FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE a.verdict='supported' ORDER BY s.generated_at DESC"
@@ -179,7 +203,7 @@ async def assess(run):
     all_ids = {eid for p in papers.values() for eid in p["quotes"]} | {
         j["id"] for j in jobs
     }
-    if not papers or (previous and not all_ids - past):
+    if not papers or (past and not all_ids - past):
         return {"snapshots": [], "reason": "没有新的有效证据"}
     instruction = (ROOT / "prompts/direction-assessment.txt").read_text()
     paper_input, job_input, restore_ids = label_inputs(papers, jobs)
