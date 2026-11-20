@@ -4,7 +4,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(os.environ.get("SCHOLARRADAR_ROOT", Path(__file__).resolve().parents[2])).resolve()
-VAR = ROOT / "var"
+VAR = Path(os.environ.get("SCHOLARRADAR_DATA_DIR", ROOT / "var")).resolve()
+if not VAR.is_relative_to(ROOT):
+    raise ValueError("数据目录须位于项目目录内")
 PRIVATE = VAR / "private"
 DB = VAR / "scholar_radar.sqlite"
 
