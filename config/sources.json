@@ -1,0 +1,27 @@
+{
+  "scope_version": "core-v1",
+  "query_version": "discovery-v1",
+  "topics": [
+    "多模态冲突下的生成前风险、内部表征与选择性回答",
+    "多轮工具交互中的约束保持、执行前风险预测与可靠后训练"
+  ],
+  "frontier": [
+    "与已有问题相邻的递归自我改进、Agent 记忆和数据构造"
+  ],
+  "arxiv_query": "(cat:cs.CL OR cat:cs.AI OR cat:cs.CV OR cat:cs.LG) AND (ti:hallucination OR ti:\"instruction following\" OR ti:\"tool use\" OR ti:\"selective prediction\")",
+  "official_job": "https://www.microsoft.com/en-us/research/opportunity/research-intern-for-machine-learning-group-discriminative-foundation-models-and-efficient-decision-making/",
+  "official_domains": [
+    "microsoft.com",
+    "deepseek.com",
+    "zhipuai.cn",
+    "moonshot.cn",
+    "alibabagroup.com",
+    "tencent.com",
+    "meituan.com",
+    "baidu.com",
+    "huawei.com",
+    "minimaxi.com",
+    "antgroup.com",
+    "xiaohongshu.com"
+  ]
+}
