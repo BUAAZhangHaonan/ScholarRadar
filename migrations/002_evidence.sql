@@ -1,0 +1,15 @@
+CREATE TABLE works(id TEXT PRIMARY KEY,title TEXT NOT NULL,first_seen TEXT NOT NULL,metadata TEXT NOT NULL);
+CREATE TABLE identifiers(namespace TEXT,value TEXT,work_id TEXT NOT NULL REFERENCES works(id),PRIMARY KEY(namespace,value));
+CREATE TABLE documents(id TEXT PRIMARY KEY,work_id TEXT REFERENCES works(id),url TEXT NOT NULL,kind TEXT NOT NULL,UNIQUE(url,kind));
+CREATE TABLE revisions(id TEXT PRIMARY KEY,document_id TEXT NOT NULL REFERENCES documents(id),upstream_revision TEXT NOT NULL,mode TEXT NOT NULL,version TEXT,observed_at TEXT NOT NULL,body TEXT NOT NULL,total_chars INTEGER NOT NULL,coverage TEXT NOT NULL,source_call TEXT REFERENCES calls(id),UNIQUE(document_id,upstream_revision,mode));
+CREATE VIRTUAL TABLE revision_search USING fts5(id UNINDEXED,body,tokenize='unicode61');
+CREATE TABLE evidence(id TEXT PRIMARY KEY,revision_id TEXT NOT NULL REFERENCES revisions(id),start INTEGER NOT NULL,end INTEGER NOT NULL,quote TEXT NOT NULL,line_start INTEGER NOT NULL,line_end INTEGER NOT NULL,stance TEXT NOT NULL,UNIQUE(revision_id,start,end));
+CREATE TABLE claims(id TEXT PRIMARY KEY,kind TEXT NOT NULL CHECK(kind IN ('source_fact','system_inference','research_hypothesis')),statement TEXT NOT NULL,conditions TEXT NOT NULL);
+CREATE TABLE claim_evidence(claim_id TEXT REFERENCES claims(id),evidence_id TEXT REFERENCES evidence(id),PRIMARY KEY(claim_id,evidence_id));
+CREATE TABLE events(id TEXT PRIMARY KEY,work_id TEXT REFERENCES works(id),kind TEXT NOT NULL,version TEXT,first_version_submitted_at TEXT,version_submitted_at TEXT,first_public_at TEXT,first_observed_at TEXT NOT NULL,fetched_at TEXT NOT NULL,source TEXT NOT NULL);
+CREATE TABLE organizations(id TEXT PRIMARY KEY,name TEXT NOT NULL,parent_id TEXT REFERENCES organizations(id));
+CREATE TABLE aliases(alias TEXT PRIMARY KEY COLLATE NOCASE,organization_id TEXT REFERENCES organizations(id));
+CREATE TABLE postings(id TEXT PRIMARY KEY,organization_id TEXT REFERENCES organizations(id),official_id TEXT,url TEXT NOT NULL UNIQUE,title TEXT NOT NULL,first_seen TEXT NOT NULL,published_at TEXT);
+CREATE TABLE posting_observations(id TEXT PRIMARY KEY,posting_id TEXT NOT NULL REFERENCES postings(id),revision_id TEXT REFERENCES revisions(id),verified_at TEXT NOT NULL,status TEXT NOT NULL,details TEXT NOT NULL);
+CREATE TABLE resources(id TEXT PRIMARY KEY,url TEXT UNIQUE NOT NULL,kind TEXT NOT NULL);
+CREATE TABLE work_resources(work_id TEXT REFERENCES works(id),resource_id TEXT REFERENCES resources(id),relation TEXT NOT NULL,PRIMARY KEY(work_id,resource_id,relation));
