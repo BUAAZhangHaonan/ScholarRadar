@@ -7,7 +7,7 @@ name = "scholar-radar"
 version = "0.1.0"
 description = "个人研究方向、证据和行动工作台"
 requires-python = ">=3.12,<3.14"
-dependencies = ["fastapi==0.136.1", "uvicorn==0.46.0", "pydantic==2.13.4", "mcp==1.27.1", "httpx==0.28.1", "python-dotenv==1.2.1"]
+dependencies = ["fastapi==0.136.1", "uvicorn==0.46.0", "pydantic==2.13.4", "mcp==1.27.1", "httpx==0.28.1", "python-dotenv==1.2.1", "asyncpg==0.31.0"]
 
 [project.scripts]
 scholar-radar = "scholar_radar.cli:main"
