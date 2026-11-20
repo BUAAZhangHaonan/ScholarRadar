@@ -77,3 +77,6 @@ app.include_router(library_router)
 
 from .actions_api import router as actions_router
 app.include_router(actions_router)
+
+from .operations_api import router as operations_router
+app.include_router(operations_router)
