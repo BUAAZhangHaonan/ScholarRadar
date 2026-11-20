@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import re
 import shlex
@@ -113,9 +114,11 @@ async def archive_run(run):
     objects.extend((path,"papers/"+vid.replace("/","_")+".pdf") for vid,path in pdfs.items())
     objects.extend((Path(x["file"]),"sources/"+x["id"]+".json") for x in raw)
     out=ROOT/"exports"/run["as_of"]/run["kind"]
-    objects.extend((p,"reports/"+run["as_of"]+"/"+run["kind"]+"/"+p.name) for p in out.glob("*") if p.is_file())
+    report_file=out/"internprep.json"
+    edition=json.loads(report_file.read_text())["snapshot_id"] if report_file.exists() else rid
+    objects.extend((p,"reports/"+run["as_of"]+"/"+run["kind"]+"/"+edition+"/"+p.name) for p in out.glob("*") if p.is_file())
     for path,rel in objects:
         await asyncio.to_thread(put_file,path,rel)
         if path.parent==stage: path.unlink(missing_ok=True)
-    snap=await asyncio.to_thread(backup,rid)
+    snap=await asyncio.to_thread(backup,edition)
     return {"objects":len(objects),"pdfs":len(pdfs),"backup":snap}

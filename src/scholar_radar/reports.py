@@ -56,7 +56,8 @@ def markdown(report):
         text.extend(["","**新增证据**　"+card["change"],"","**待验证的预测**　"+card["forecast"]["hypothesis"],"",
                      "支持条件　"+str(card["forecast"]["confirm"]),"","反例条件　"+str(card["forecast"]["refute"]),"",
                      "**下一步**　"+card["action"]["title"],""])
-    if not report["directions"]: text.extend(["当期没有通过证据校验的新方向变化。",""])
+    if not report["directions"]:
+        text.extend(["分析尚有未完成项，请结合来源覆盖查看。" if report.get("issues") else "当期没有通过证据校验的新方向变化。",""])
     for e in report["evidence"]: text.append(f"- [{e['title'] or '官方岗位'} · 第 {e['line_start']} 行]({e['url']})　`{e['id']}`")
     text.extend(["","## 来源与用量",""])
     for src in report["coverage"]["sources"]: text.append(f"- {src['source']}　{src['status']}　{src['reason'] or ''}")
@@ -89,8 +90,15 @@ async def publish(run):
             obj["coverage"]["window_start"]=str(start)
         actions=rows(db,"SELECT title,kind,status FROM actions ORDER BY created_at DESC LIMIT 20")
         feedback=rows(db,"SELECT dimension,value,count(*) count FROM feedback GROUP BY dimension,value")
-    report={**obj,"kind":kind,"date":str(day)}
-    if kind!="daily" and cards:
+    with database() as db:
+        issues=rows(db,"SELECT stage,outcome FROM jobs WHERE run_id=? AND status='failed' ORDER BY stage,id",(rid,))
+    report={**obj,"kind":kind,"date":str(day),"issues":issues}
+    report["snapshot_id"]=key(obj["snapshot_id"],issues,obj["coverage"])
+    with database() as db:
+        saved=db.execute("SELECT body FROM report_versions WHERE id=?",(report["snapshot_id"],)).fetchone()
+    if saved:
+        report=json.loads(saved[0])
+    if not saved and kind!="daily" and cards:
         review=await ask(kind+"_review",prof["strong_model"],
             "只使用给定方向快照和反馈，写中文复盘。返回 {summary,readings:[证据ID],proposal:{action_id,why},unresolved}。"
             "总结研究线索怎样演变、尚待验证的预测和判断条件。读物最多五份，最多一个可选验证。"
@@ -102,9 +110,12 @@ async def publish(run):
         report["review"]=review
     with database(write=True) as db:
         report["cost"]=cost_summary(db,rid)
-        db.execute("INSERT OR IGNORE INTO reports VALUES(?,?,?,?,?,?)",(key(rid,kind),rid,kind,str(day),dump(report),now()))
-        # Subsequent calls render the immutable report that was actually published.
-        report=json.loads(db.execute("SELECT body FROM reports WHERE run_id=? AND kind=?",(rid,kind)).fetchone()[0])
+        report_id=key(rid,kind)
+        db.execute("""INSERT INTO reports VALUES(?,?,?,?,?,?) ON CONFLICT(run_id,kind) DO UPDATE SET
+                      body=excluded.body,generated_at=excluded.generated_at""",
+                   (report_id,rid,kind,str(day),dump(report),report["generated_at"]))
+        db.execute("INSERT OR IGNORE INTO report_versions VALUES(?,?,?,?)",
+                   (report["snapshot_id"],report_id,report["generated_at"],dump(report)))
     out=ROOT/"exports"/str(day)/kind
     atomic_text(out/"report.md",markdown(report))
     atomic_text(out/"internprep.json",json.dumps(report,ensure_ascii=False,indent=2))
