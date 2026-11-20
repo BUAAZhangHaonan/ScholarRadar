@@ -1,0 +1,1 @@
+CREATE TABLE resource_observations(id TEXT PRIMARY KEY,resource_id TEXT NOT NULL REFERENCES resources(id),run_id TEXT REFERENCES runs(id),revision_id TEXT REFERENCES revisions(id),observed_at TEXT NOT NULL,status TEXT NOT NULL,evidence_id TEXT REFERENCES evidence(id),details TEXT NOT NULL);
