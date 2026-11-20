@@ -1,13 +1,37 @@
 import asyncio
 import json
+from contextvars import ContextVar
 from datetime import date, timedelta
 
 from .calls import invoke
 from .settings import ROOT
 
 
-def sources():
-    return json.loads((ROOT / "config/sources.json").read_text())
+active_scope=ContextVar("active_source_scope",default=None)
+
+
+def sources(version=None):
+    from .db import database
+    version=version or active_scope.get()
+    with database() as db:
+        if version:
+            stored=db.execute("SELECT body FROM scope_versions WHERE id=?",(version,)).fetchone()
+        else:
+            stored=db.execute("SELECT s.body FROM scope_activations a JOIN scope_versions s ON s.id=a.scope_id ORDER BY a.id DESC LIMIT 1").fetchone()
+    return json.loads(stored[0]) if stored else json.loads((ROOT / "config/sources.json").read_text())
+
+
+def update_scope(db,topics,query):
+    from .db import key
+    from .settings import dump,now
+    if not 1<=len(topics)<=12 or any(not 1<=len(t.strip())<=350 for t in topics) or not 1<=len(query.strip())<=1500:
+        raise ValueError("来源主题或观察范围无效")
+    base=json.loads((ROOT/"config/sources.json").read_text())
+    base.update(topics=topics,arxiv_query=query)
+    ident="scope-"+key(topics,query)[:12]; base.update(scope_version=ident,query_version=ident)
+    db.execute("INSERT OR IGNORE INTO scope_versions VALUES(?,?,?)",(ident,now(),dump(base)))
+    db.execute("INSERT INTO scope_activations(scope_id,at) VALUES(?,?)",(ident,now()))
+    return base
 
 
 async def discover_papers(day: date, cold: bool, run_id=None):

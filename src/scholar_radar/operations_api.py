@@ -93,3 +93,19 @@ def evaluation():
     with database() as db:
         today=datetime.now(ZoneInfo(get_profile(db)["timezone"])).date()
         return forward(db,str(today))
+
+class ScopeUpdate(BaseModel):
+    topics: list[str]
+    arxiv_query: str
+
+
+@router.get("/api/scopes")
+def source_scope():
+    from .discovery import sources
+    return sources()
+
+
+@router.put("/api/scopes")
+def edit_scope(update:ScopeUpdate):
+    from .discovery import update_scope
+    with database(write=True) as db: return update_scope(db,update.topics,update.arxiv_query)

@@ -32,6 +32,8 @@ async def heartbeat(jid,owner):
 
 
 async def execute(run,job,owner):
+    from .discovery import active_scope
+    scope_token=active_scope.set(run["scope"])
     beat=asyncio.create_task(heartbeat(job["id"],owner))
     try:
         if job["stage"]=="discover": await inventory()
@@ -42,6 +44,7 @@ async def execute(run,job,owner):
         detail={"error_type":type(exc).__name__,"error":str(exc)[:320]}
         ok=False
     finally:
+        active_scope.reset(scope_token)
         beat.cancel()
         await asyncio.gather(beat,return_exceptions=True)
     with database(write=True) as db: finish(db,run["id"],job["id"],ok,detail)
