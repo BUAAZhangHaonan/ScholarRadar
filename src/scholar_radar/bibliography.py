@@ -144,6 +144,19 @@ async def shortlist(papers, profile, limit, run_id=None):
         }
         for i, p in subset.items()
     ]
+    from .shadow import active_signals
+    from .db import database
+    from .settings import now
+
+    with database() as db:
+        if db.execute(
+            "SELECT 1 FROM proposals WHERE lifecycle='active' LIMIT 1"
+        ).fetchone():
+            cutoff = now()
+            for row in records:
+                row["active_factors"] = active_signals(
+                    db, subset[row["id"]].get("work_id"), cutoff
+                )
     instr = (
         "从本次真实候选选出与研究问题最贴近、具有具体实验或可复用资源的材料。排除领域只可作为旁证。"
         "输出 {selected:[{id,reason,theme}]}，id必须来自候选。保留少量相邻和方法上不同的材料，"

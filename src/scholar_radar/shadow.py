@@ -8,6 +8,32 @@ from .settings import dump, now
 RULES = {"has_located_evidence", "linked_resource", "independent_support"}
 
 
+def measure(db, rule, wid, cutoff):
+    if rule == "has_located_evidence":
+        sql = """SELECT EXISTS(SELECT 1 FROM evidence e JOIN revisions v ON v.id=e.revision_id JOIN documents d ON d.id=v.document_id
+             JOIN factor_input_times t ON t.kind='evidence' AND t.entity=e.id WHERE d.work_id=? AND t.at<=?)"""
+        return db.execute(sql, (wid, cutoff)).fetchone()[0]
+    if rule == "linked_resource":
+        return db.execute(
+            "SELECT EXISTS(SELECT 1 FROM factor_input_times WHERE kind='resource' AND entity=? AND at<=?)",
+            (wid, cutoff),
+        ).fetchone()[0]
+    return db.execute(
+        """SELECT count(DISTINCT m2.work_id) FROM memberships m JOIN memberships m2 ON m.direction_id=m2.direction_id
+          WHERE m.work_id=? AND m2.work_id!=m.work_id AND m.created_at<=? AND m2.created_at<=?""",
+        (wid, cutoff, cutoff),
+    ).fetchone()[0]
+
+
+def active_signals(db, wid, cutoff):
+    signals = {}
+    for row in db.execute("SELECT definition FROM proposals WHERE lifecycle='active'"):
+        spec = json.loads(row[0])
+        if wid and spec["method"] in RULES:
+            signals[spec["target"]] = measure(db, spec["method"], wid, cutoff)
+    return signals
+
+
 def refresh(db, run_id=None):
     if not db.execute("SELECT 1 FROM proposals LIMIT 1").fetchone():
         propose(
@@ -40,34 +66,11 @@ def refresh(db, run_id=None):
                 continue
             candidates = json.loads(evaluation["candidates"])
             baseline = json.loads(evaluation["baseline"])
-            cutoff = (
-                db.execute(
-                    "SELECT max(generated_at) FROM reports WHERE run_id=?",
-                    (evaluation["run_id"],),
-                ).fetchone()[0]
-                or now()
-            )
-            score = {}
-            for wid in candidates:
-                if rule == "has_located_evidence":
-                    value = db.execute(
-                        """SELECT EXISTS(SELECT 1 FROM evidence e JOIN revisions v ON e.revision_id=v.id
-                       JOIN documents d ON d.id=v.document_id WHERE d.work_id=? AND v.observed_at<=?)""",
-                        (wid, cutoff),
-                    ).fetchone()[0]
-                elif rule == "linked_resource":
-                    value = db.execute(
-                        """SELECT EXISTS(SELECT 1 FROM work_resources wr WHERE wr.work_id=? AND EXISTS(
-                        SELECT 1 FROM documents d JOIN revisions v ON v.document_id=d.id WHERE d.work_id=wr.work_id AND v.observed_at<=?))""",
-                        (wid, cutoff),
-                    ).fetchone()[0]
-                else:
-                    value = db.execute(
-                        """SELECT count(DISTINCT m2.work_id) FROM memberships m JOIN memberships m2
-                       ON m.direction_id=m2.direction_id WHERE m.work_id=? AND m2.work_id!=m.work_id AND m.created_at<=? AND m2.created_at<=?""",
-                        (wid, cutoff, cutoff),
-                    ).fetchone()[0]
-                score[wid] = value
+            cutoff = db.execute(
+                "SELECT at FROM factor_input_times WHERE kind='evaluation' AND entity=?",
+                (evaluation["id"],),
+            ).fetchone()[0]
+            score = {wid: measure(db, rule, wid, cutoff) for wid in candidates}
             positions = {wid: i for i, wid in enumerate(baseline)}
             ranked = sorted(
                 candidates,
