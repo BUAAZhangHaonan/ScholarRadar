@@ -41,7 +41,7 @@ bash scripts/install-services.sh
 .venv/bin/scholar-radar restore-copy backups/manual-checkpoint.sqlite var/restores/manual-checkpoint.sqlite
 ```
 
-恢复命令写入新的本地文件，并检查数据库完整性、外键、作品、证据关系与任务。验证恢复库可通过 `SCHOLARRADAR_DATA_DIR` 指向项目内独立数据目录；工作数据库名为 `scholar_radar.sqlite`。切换生产库前先停止 API 与 worker，保留当前数据库和 WAL，核对恢复副本后再执行明确的切换。数据库采用本机 WAL，网络存储只承载版本化对象和一致性备份。暂存上限 `staging_limit_bytes` 默认 2 GiB，`local_backup_count` 默认保留最近 7 份本地备份，清理前检查 NAS 归档状态。
+备份名标识一次固定快照，重用名称会返回已归档的版本。恢复命令写入新的本地文件，并检查数据库完整性、外键、作品、证据关系与任务。验证恢复库可通过 `SCHOLARRADAR_DATA_DIR` 指向项目内独立数据目录；工作数据库名为 `scholar_radar.sqlite`。切换生产库前先停止 API 与 worker，保留当前数据库和 WAL，核对恢复副本后再执行明确的切换。数据库采用本机 WAL，网络存储只承载版本化对象和一致性备份。暂存上限 `staging_limit_bytes` 默认 2 GiB，`local_backup_count` 默认保留最近 7 份本地备份，清理前检查 NAS 归档状态。
 
 ## 数据接口
 

@@ -113,6 +113,13 @@ def put_file(path, relative):
 
 def backup(stamp):
     file = VAR / "backups" / (stamp + ".sqlite")
+    rel = "backups/" + file.name
+    with database() as db:
+        existing = db.execute(
+            "SELECT status FROM archives WHERE remote_path=?", (rel,)
+        ).fetchone()
+        if existing and existing[0] == "archived":
+            return rel
     file.parent.mkdir(parents=True, exist_ok=True)
     if not file.exists():
         temp = file.with_suffix(".incomplete")
@@ -123,7 +130,6 @@ def backup(stamp):
             finally:
                 target.close()
         os.replace(temp, file)
-    rel = "backups/" + file.name
     put_file(file, rel)
     return rel
 
