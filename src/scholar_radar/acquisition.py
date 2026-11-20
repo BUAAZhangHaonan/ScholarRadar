@@ -14,7 +14,7 @@ from .settings import VAR,atomic_text,dump,now
 
 def coverage(db,rid,source,flow,scope,query,start,end,count,unique,status,*,complete=False,classified=False,cursor=None,path=None,reason=None):
     db.execute("INSERT OR REPLACE INTO coverage VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-               (key(rid,source,scope,query,start,end),rid,source,flow,scope,query,str(start),str(end),cursor,count,
+               (key(rid,source,scope,query,str(start),str(end)),rid,source,flow,scope,query,str(start),str(end),cursor,count,
                 unique,int(complete),int(classified),status,path,reason))
 
 
