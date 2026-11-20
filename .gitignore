@@ -1,0 +1,13 @@
+.*
+!/.gitignore
+_scratch/
+var/
+exports/
+__pycache__/
+*.py[cod]
+*.egg-info/
+node_modules/
+dist/
+build/
+config/app.local.*
+config/profile.local.*
