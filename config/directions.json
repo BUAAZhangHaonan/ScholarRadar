@@ -1,0 +1,34 @@
+[
+  {
+    "id": "pre-generation-risk",
+    "title": "回答前能否识别多模态冲突？",
+    "layer": "core",
+    "question": "生成前的内部状态能否预测视觉证据与语言先验的冲突？",
+    "method": "比较跨层表征、输出置信度与选择性回答",
+    "setting": "固定任务划分下的多模态问答与风险覆盖曲线"
+  },
+  {
+    "id": "tool-constraint",
+    "title": "多轮工具使用能否保持原始约束？",
+    "layer": "adjacent",
+    "question": "执行前风险信号能否减少工具交互中的约束违背？",
+    "method": "监测轨迹状态，比较选择性执行与后训练策略",
+    "setting": "包含多轮工具反馈和明确用户约束的任务"
+  },
+  {
+    "id": "context-reliability",
+    "title": "上下文更新何时改变可靠决策？",
+    "layer": "adjacent",
+    "question": "哪些历史证据应被保留以改变后续决策？",
+    "method": "比较记忆选择、证据更新与奖励构造",
+    "setting": "需要持续维护目标的语言模型交互"
+  },
+  {
+    "id": "self-improvement",
+    "title": "自我改进能否带来独立可测的收益？",
+    "layer": "frontier",
+    "question": "递归改进的哪些局部步骤能在固定评测上检验？",
+    "method": "核对独立数据与冻结基线",
+    "setting": "小预算可区分的子问题与基模级训练分别判断"
+  }
+]

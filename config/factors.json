@@ -1,0 +1,86 @@
+[
+  {
+    "id": "activity_share_change",
+    "version": "1",
+    "target": "观察范围中方向份额的变化",
+    "rule": "deterministic",
+    "requires": [
+      "可比且完整的相邻28日窗口",
+      "统一方向归类"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": 28
+  },
+  {
+    "id": "evidence_progress",
+    "version": "1",
+    "target": "新增证据改变的判断",
+    "rule": "qualitative",
+    "requires": [
+      "原文片段",
+      "最近邻比较与反例"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": null
+  },
+  {
+    "id": "reproducibility",
+    "version": "1",
+    "target": "复现实验所需资源",
+    "rule": "qualitative",
+    "requires": [
+      "代码、权重、数据、协议及实测状态"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": null
+  },
+  {
+    "id": "research_opening",
+    "version": "1",
+    "target": "可区分的研究切入点",
+    "rule": "qualitative",
+    "requires": [
+      "近邻工作",
+      "待检验假设",
+      "对照与判定条件"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": null
+  },
+  {
+    "id": "personal_feasibility",
+    "version": "1",
+    "target": "给定资产与资源的首轮可行性",
+    "rule": "qualitative",
+    "requires": [
+      "已知资产",
+      "预算与未知条件"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": null
+  },
+  {
+    "id": "career_match",
+    "version": "1",
+    "target": "与正式岗位要求的关联",
+    "rule": "qualitative",
+    "requires": [
+      "官方详情与核验时间",
+      "能力与证据的映射"
+    ],
+    "missing": "null_with_reason",
+    "lifecycle": "active",
+    "predictive_validation_status": "not_evaluated",
+    "window_days": null
+  }
+]

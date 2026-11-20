@@ -1,0 +1,17 @@
+CREATE TABLE directions(id TEXT PRIMARY KEY,title TEXT NOT NULL,layer TEXT NOT NULL,status TEXT NOT NULL,question TEXT NOT NULL,method TEXT NOT NULL,setting TEXT NOT NULL,definition_version TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE direction_relations(id TEXT PRIMARY KEY,from_id TEXT REFERENCES directions(id),to_id TEXT REFERENCES directions(id),relation TEXT NOT NULL,status TEXT NOT NULL,at TEXT NOT NULL);
+CREATE TABLE direction_names(direction_id TEXT REFERENCES directions(id),name TEXT NOT NULL,at TEXT NOT NULL,PRIMARY KEY(direction_id,name));
+CREATE TABLE memberships(direction_id TEXT REFERENCES directions(id),work_id TEXT REFERENCES works(id),rule_version TEXT NOT NULL,basis TEXT NOT NULL,created_at TEXT NOT NULL,PRIMARY KEY(direction_id,work_id,rule_version));
+CREATE TABLE snapshots(id TEXT PRIMARY KEY,dir_id TEXT NOT NULL REFERENCES directions(id),run_id TEXT NOT NULL REFERENCES runs(id),as_of TEXT NOT NULL,generated_at TEXT NOT NULL,profile_id TEXT REFERENCES profiles(id),scope TEXT NOT NULL,rule_version TEXT NOT NULL,body TEXT NOT NULL,input_key TEXT NOT NULL,UNIQUE(dir_id,as_of,profile_id,scope,rule_version,input_key));
+CREATE TABLE snapshot_evidence(snapshot_id TEXT REFERENCES snapshots(id),evidence_id TEXT REFERENCES evidence(id),PRIMARY KEY(snapshot_id,evidence_id));
+CREATE TABLE snapshot_claims(snapshot_id TEXT REFERENCES snapshots(id),claim_id TEXT REFERENCES claims(id),PRIMARY KEY(snapshot_id,claim_id));
+CREATE TABLE factor_definitions(id TEXT,version TEXT,target TEXT NOT NULL,rule TEXT NOT NULL,lifecycle TEXT NOT NULL,definition TEXT NOT NULL,PRIMARY KEY(id,version));
+CREATE TABLE factor_values(snapshot_id TEXT REFERENCES snapshots(id),factor_id TEXT,factor_version TEXT,value TEXT,reason TEXT,evidence_ids TEXT NOT NULL,PRIMARY KEY(snapshot_id,factor_id),FOREIGN KEY(factor_id,factor_version) REFERENCES factor_definitions(id,version));
+CREATE TABLE proposals(id TEXT PRIMARY KEY,definition TEXT NOT NULL,lifecycle TEXT NOT NULL,updated_at TEXT NOT NULL);
+CREATE TABLE actions(id TEXT PRIMARY KEY,snapshot_id TEXT REFERENCES snapshots(id),title TEXT NOT NULL,kind TEXT NOT NULL,status TEXT NOT NULL,details TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE TABLE action_events(id TEXT PRIMARY KEY,action_id TEXT NOT NULL REFERENCES actions(id),previous TEXT NOT NULL,decision TEXT NOT NULL,reason TEXT,actual TEXT NOT NULL,at TEXT NOT NULL);
+CREATE TABLE feedback(id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,dimension TEXT NOT NULL,value TEXT NOT NULL,reason TEXT,created_at TEXT NOT NULL);
+CREATE TABLE evaluations(id TEXT PRIMARY KEY,run_id TEXT REFERENCES runs(id),candidates TEXT NOT NULL,baseline TEXT NOT NULL,selected TEXT NOT NULL,as_of TEXT NOT NULL,status TEXT NOT NULL);
+CREATE TABLE readings(run_id TEXT REFERENCES runs(id),work_key TEXT NOT NULL,paper TEXT NOT NULL,status TEXT NOT NULL,outcome TEXT NOT NULL,PRIMARY KEY(run_id,work_key));
+CREATE TABLE reports(id TEXT PRIMARY KEY,run_id TEXT REFERENCES runs(id),kind TEXT NOT NULL,as_of TEXT NOT NULL,body TEXT NOT NULL,generated_at TEXT NOT NULL,UNIQUE(run_id,kind));
+CREATE TABLE observed(source TEXT,scope TEXT,event_time TEXT NOT NULL,work_id TEXT REFERENCES works(id),version TEXT NOT NULL,membership_version TEXT,PRIMARY KEY(source,scope,work_id,version));
