@@ -1,0 +1,27 @@
+{
+  "goals": [
+    "多模态冲突的生成前信号",
+    "多轮工具交互中的约束保持"
+  ],
+  "assets": [],
+  "target_companies": [],
+  "excluded_companies": [],
+  "deferred_companies": [],
+  "excluded_topics": [],
+  "compute": {
+    "research_gpu_hours": null
+  },
+  "sources": [
+    {
+      "source": "本地初始化",
+      "state": "需要填写个人资产"
+    }
+  ],
+  "timezone": "Asia/Shanghai",
+  "daily_time": "07:30",
+  "validation_weeks": [
+    1,
+    2
+  ],
+  "active_limit": 1
+}
