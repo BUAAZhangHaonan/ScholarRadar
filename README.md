@@ -55,4 +55,4 @@ bash scripts/install-services.sh
 .venv/bin/python -B -m unittest discover -s tests -v
 ```
 
-[实际环境](docs/environment.md) · [MCP 能力目录](docs/capabilities.json) · [来源与计算口径](docs/source_contracts.md)
+[首版真实验收](docs/acceptance.md) · [实际环境](docs/environment.md) · [MCP 能力目录](docs/capabilities.json) · [来源与计算口径](docs/source_contracts.md)
