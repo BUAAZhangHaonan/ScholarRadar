@@ -78,8 +78,11 @@ def trigger(data: RunRequest):
         today = datetime.now(ZoneInfo(get_profile(db)["timezone"])).date()
         if data.day and data.day > today:
             raise ValueError("不能提前生成未来日期的报告")
+        count = db.total_changes
         rid = enqueue(db, data.kind, data.day or today)
-    return {"run_id": rid}
+        reused = count == db.total_changes
+        status = db.execute("SELECT status FROM runs WHERE id=?", (rid,)).fetchone()[0]
+    return {"run_id": rid, "status": status, "reused": reused}
 
 
 @router.get("/api/status")

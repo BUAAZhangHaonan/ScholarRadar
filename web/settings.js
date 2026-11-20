@@ -96,7 +96,11 @@ export async function render() {
   $("#refresh").onclick = render;
   $("#launch").onclick = async () => {
     const r = await send("/api/runs", { kind: $("#mode").value });
-    msg("任务已入队 " + r.run_id.slice(0, 8));
+    msg(
+      r.reused
+        ? "已复用已有任务 · " + t(r.status)
+        : "任务已入队 " + r.run_id.slice(0, 8),
+    );
     render();
   };
   $("#profile-form").onsubmit = async (e) => {
