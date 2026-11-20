@@ -1,6 +1,24 @@
-import {$,esc,showEvidence,msg} from "./common.js";
-const routes={"/":"daily","/directions":"directions","/library":"library","/actions":"actions","/settings":"settings"};
-for(const nav of document.querySelectorAll("nav a"))if(nav.pathname===location.pathname)nav.setAttribute("aria-current","page");
-$("#close").onclick=()=>$("#detail").close();
-document.addEventListener("click",e=>{const b=e.target.closest("[data-evidence]");if(b)showEvidence(b.dataset.evidence).catch(x=>msg(x.message))});
-try{const page=await import("./"+(routes[location.pathname]||"daily")+".js");await page.render()}catch(err){$("#app").innerHTML='<p class="error">'+esc(err.message)+'</p>'}
+import { $, esc, showEvidence, msg } from "./common.js";
+const routes = {
+  "/": "daily",
+  "/directions": "directions",
+  "/library": "library",
+  "/actions": "actions",
+  "/settings": "settings",
+};
+for (const nav of document.querySelectorAll("nav a"))
+  if (nav.pathname === location.pathname)
+    nav.setAttribute("aria-current", "page");
+$("#close").onclick = () => $("#detail").close();
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-evidence]");
+  if (b) showEvidence(b.dataset.evidence).catch((x) => msg(x.message));
+});
+try {
+  const page = await import(
+    "./" + (routes[location.pathname] || "daily") + ".js"
+  );
+  await page.render();
+} catch (err) {
+  $("#app").innerHTML = '<p class="error">' + esc(err.message) + "</p>";
+}
