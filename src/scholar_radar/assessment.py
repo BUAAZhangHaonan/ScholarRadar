@@ -25,7 +25,7 @@ def packet(db, run):
     history = rows(
         db,
         """SELECT w.id wid,w.title,w.metadata,w.first_seen,e.id eid,e.quote,NULL statement FROM
-        snapshots s JOIN snapshot_evidence se ON se.snapshot_id=s.id JOIN evidence e ON e.id=se.evidence_id
+        snapshots s JOIN assessment_reviews ar ON ar.snapshot_id=s.id AND ar.verdict='supported' JOIN snapshot_evidence se ON se.snapshot_id=s.id JOIN evidence e ON e.id=se.evidence_id
         JOIN revisions v ON v.id=e.revision_id JOIN documents d ON d.id=v.document_id JOIN works w ON w.id=d.work_id
         WHERE s.as_of<=? ORDER BY s.generated_at DESC LIMIT 90""",
         (run["as_of"] + "T23:59:59",),
@@ -47,6 +47,15 @@ def packet(db, run):
         )
         if len(p["quotes"]) < 4:
             p["quotes"][r["eid"]] = r["quote"][:1400]
+    for wid, p in papers.items():
+        p["resources"] = rows(
+            db,
+            """SELECT DISTINCT res.url,o.status,o.observed_at,e.quote FROM work_resources m
+            JOIN resources res ON res.id=m.resource_id JOIN resource_observations o ON o.resource_id=res.id
+            LEFT JOIN evidence e ON e.id=o.evidence_id WHERE m.work_id=? AND o.status='accessible'
+            ORDER BY o.observed_at DESC LIMIT 3""",
+            (wid,),
+        )
     jobs = rows(
         db,
         """SELECT e.id,e.quote,p.title,p.url,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
@@ -56,7 +65,7 @@ def packet(db, run):
     )
     previous = {}
     for r in db.execute(
-        "SELECT dir_id,id,body FROM snapshots ORDER BY generated_at DESC"
+        "SELECT s.dir_id,s.id,s.body FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE a.verdict='supported' ORDER BY s.generated_at DESC"
     ):
         if r["dir_id"] not in previous:
             previous[r["dir_id"]] = {
