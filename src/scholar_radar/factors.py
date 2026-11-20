@@ -1,18 +1,23 @@
 import json
 from datetime import date,timedelta
 from .db import key
+from .classification import taxonomy,covers
 from .settings import dump,now
 
 
-def activity(db, direction, scope, end, version="1"):
+def activity(db, direction, scope, end, version=None):
+    version=version or taxonomy(db)[0]
     end=date.fromisoformat(str(end)[:10])
     windows=[(end-timedelta(days=56),end-timedelta(days=28)),(end-timedelta(days=28),end)]
     counts=[]
     for a,b in windows:
-        covers=db.execute("""SELECT DISTINCT source FROM coverage WHERE flow='observation' AND query='submitted'
-            AND scope=? AND start<=? AND end>=? AND complete=1 AND classified=1""",(scope,str(a),str(b))).fetchall()
-        if len(covers)!=1: return None,"两个 28 天窗口需同源、完整采集并按同一规则归类"
-        source=covers[0][0]
+        intervals={}
+        for row in db.execute("""SELECT source,start,end FROM coverage WHERE flow='observation' AND query='submitted'
+                 AND scope=? AND end>? AND start<? AND complete=1 AND classified=1""",(scope,str(a),str(b))):
+            intervals.setdefault(row["source"],[]).append((row["start"],row["end"]))
+        eligible=[source for source,parts in intervals.items() if covers(parts,str(a),str(b))]
+        if len(eligible)!=1: return None,"两个 28 天窗口需同源、完整采集并按同一规则归类"
+        source=eligible[0]
         if counts and counts[0]["source"]!=source: return None,"前后窗口的数据源不同"
         members=db.execute("""SELECT o.work_id,min(o.membership_version) rule FROM observed o WHERE scope=? AND source=?
              AND event_time>=? AND event_time<? GROUP BY o.work_id""",(scope,source,str(a),str(b))).fetchall()

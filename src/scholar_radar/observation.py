@@ -102,4 +102,7 @@ async def observe(run):
                      "ok" if complete else "partial",complete=complete,cursor=str(offset),path=str(raw),reason=reason)
             if complete:
                 db.execute("INSERT OR REPLACE INTO cursors VALUES(?,?,?,?)",(source,scope,stream,str(end)))
+    if complete:
+        from .classification import classify
+        await classify(run)
     return {"scope":scope,"source":source,"complete":complete,"reason":reason}
