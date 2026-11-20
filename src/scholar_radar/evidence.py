@@ -12,8 +12,27 @@ ARXIV = re.compile(
 
 
 def arxiv_id(value):
-    m = ARXIV.search(str(value or "").strip().split("?")[0])
-    return (m[1].lower(), m[2] or "") if m else (None, "")
+    value = str(value or "").strip().lower()
+    if value.startswith(("https://", "http://")):
+        url = urlsplit(value)
+        if url.hostname in {
+            "arxiv.org",
+            "www.arxiv.org",
+            "export.arxiv.org",
+        } and url.path.startswith(("/abs/", "/pdf/")):
+            value = url.path.split("/", 2)[2]
+        elif url.hostname in {"doi.org", "dx.doi.org"}:
+            value = url.path.lstrip("/")
+        else:
+            return None, ""
+    value = value.removeprefix("10.48550/arxiv.")
+    m = ARXIV.fullmatch(value)
+    if not m:
+        return None, ""
+    base = m[1].lower()
+    if base[0].isdigit() and not 1 <= int(base[2:4]) <= 12:
+        return None, ""
+    return base, m[2] or ""
 
 
 def work(db, title, ids, meta=None):
@@ -73,7 +92,7 @@ def revision(
     ranges = [[0, len(body)]] if ranges is None else ranges
     db.execute("INSERT OR IGNORE INTO documents VALUES(?,?,?,?)", (did, wid, url, kind))
     old = db.execute("SELECT body FROM revisions WHERE id=?", (rid,)).fetchone()
-    if old and body != old[0] and not body.startswith(old[0]):
+    if old and not body.startswith(old[0]) and not old[0].startswith(body):
         raise ValueError("同一文档修订的文本与原记录冲突")
     if not old:
         db.execute(

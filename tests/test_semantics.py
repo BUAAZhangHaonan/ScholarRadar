@@ -172,3 +172,15 @@ class Semantics(DatabaseCase):
                 ).fetchone()[0],
                 0,
             )
+
+    def test_identifiers_must_match_the_entire_official_namespace(self):
+        from scholar_radar.evidence import arxiv_id
+
+        self.assertEqual(arxiv_id("10.1017/rsm.2026.10118"), (None, ""))
+        self.assertEqual(arxiv_id("10.9999/journal.2401.12345"), (None, ""))
+        self.assertEqual(
+            arxiv_id("https://arxiv.org/pdf/2401.12345v2.pdf"), ("2401.12345", "v2")
+        )
+        self.assertEqual(
+            arxiv_id("https://doi.org/10.48550/arXiv.2401.12345"), ("2401.12345", "")
+        )
