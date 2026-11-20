@@ -24,9 +24,28 @@ export async function detail(id) {
   const detail = d.snapshots
     .map((s) => {
       const b = s.body;
+      if (s.review?.verdict && s.review.verdict !== "supported") {
+        return (
+          '<section class="card"><span class="tag">保持观察</span><h3>' +
+          esc(b.title) +
+          "</h3><p>" +
+          esc(s.review.reason) +
+          '</p><div class="row">' +
+          (b.evidence_ids || [])
+            .slice(0, 2)
+            .map((x, i) => evid(x, "原文 " + (i + 1)))
+            .join(" ") +
+          "</div></section>"
+        );
+      }
       return (
         '<section class="card"><span class="meta">' +
-        esc(s.as_of.slice(0, 10)) +
+        esc(
+          new Intl.DateTimeFormat("zh-CN", {
+            timeZone: "Asia/Shanghai",
+            dateStyle: "medium",
+          }).format(new Date(s.as_of)),
+        ) +
         "</span><h2>" +
         esc(b.judgment) +
         "</h2><p>" +
