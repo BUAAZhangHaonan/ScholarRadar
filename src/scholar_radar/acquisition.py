@@ -105,3 +105,28 @@ async def reading(run,payload):
     with database(write=True) as db:
         db.execute("UPDATE readings SET status='done',outcome=? WHERE run_id=? AND work_key=?",(dump(result),rid,wk))
     return result
+
+
+async def complete_cold_batch(run):
+    """Fill available first-batch slots when a configured core theme lacks an anchored reading."""
+    if not json.loads(run["detail"])["cold"]: return {"additional":0}
+    rid=run["id"]
+    with database() as db:
+        existing=list(db.execute("SELECT work_key,paper,status FROM readings WHERE run_id=?",(rid,)))
+        profile=get_profile(db,run["profile_id"])
+    slots=min(4,20-len(existing))
+    if slots<1: return {"additional":0}
+    def core(p):
+        title=p["title"].lower()
+        return ("hallucinat" in title or "conflict" in title) and any(w in title for w in ("visual","vision","multimodal","multi-modal","image"))
+    if sum(core(json.loads(r["paper"])) for r in existing if r["status"]=="done")>=2:
+        return {"additional":0}
+    known={r["work_key"] for r in existing}
+    candidates=[p for p in json.loads((folder(rid)/"candidates.json").read_text()) if core(p) and p.get("arxiv_id") and external_key(p) not in known]
+    chosen=await shortlist(candidates,profile,slots,rid)
+    with database(write=True) as db:
+        for p in chosen:
+            wk=external_key(p)
+            db.execute("INSERT OR IGNORE INTO readings VALUES(?,?,?,'queued','{}')",(rid,wk,dump(p)))
+            job(db,rid,"read",{"key":wk})
+    return {"additional":len(chosen),"reason":"补足缺少固定原文的核心研究问题"}
