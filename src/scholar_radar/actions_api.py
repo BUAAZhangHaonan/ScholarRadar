@@ -29,7 +29,7 @@ class Feedback(BaseModel):
 @router.get("/api/actions")
 def actions():
     with database() as db:
-        items=rows(db,"SELECT a.*,s.dir_id FROM actions a JOIN snapshots s ON s.id=a.snapshot_id ORDER BY a.created_at DESC")
+        items=rows(db,"SELECT a.*,s.dir_id FROM actions a JOIN snapshots s ON s.id=a.snapshot_id JOIN assessment_reviews r ON r.snapshot_id=s.id WHERE r.verdict='supported' OR a.status!='proposed' ORDER BY a.created_at DESC")
         for a in items:
             a["details"]=json.loads(a["details"])
             a["events"]=rows(db,"SELECT * FROM action_events WHERE action_id=? ORDER BY at",(a["id"],))

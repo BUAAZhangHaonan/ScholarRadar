@@ -16,11 +16,12 @@ from .queue import take,finish,schedule
 from .registry import initialize
 from .reports import publish
 from .review import review
+from .corrections import revise
 from .resources import verify_resources
 from .settings import VAR,now
 
 STAGES={"discover":collect,"official":postings,"observe":observe,"screen":screen,
-        "read":reading,"complete_batch":complete_cold_batch,"assess":assess,"review":review,"resources":verify_resources,"publish":publish,"archive":archive_run}
+        "read":reading,"complete_batch":complete_cold_batch,"assess":assess,"review":review,"revise":revise,"resources":verify_resources,"publish":publish,"archive":archive_run}
 
 
 async def heartbeat(jid,owner):
