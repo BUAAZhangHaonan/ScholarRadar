@@ -284,7 +284,8 @@ async def publish(run):
             review["proposal"] = None
         report["review"] = review
     with database(write=True) as db:
-        report["cost"] = cost_summary(db, rid)
+        if not saved:
+            report["cost"] = cost_summary(db, rid)
         report_id = key(rid, kind)
         db.execute(
             """INSERT INTO reports VALUES(?,?,?,?,?,?) ON CONFLICT(run_id,kind) DO UPDATE SET
