@@ -46,7 +46,7 @@ def install(app):
             if path.startswith("/api/"): return JSONResponse({"detail":"请先登录"},status_code=401)
             return RedirectResponse("/login",status_code=303)
         response=await call_next(request)
-        response.headers["Referrer-Policy"]="no-referrer"
+        response.headers["Referrer-Policy"]="same-origin"
         response.headers["Cache-Control"]="private, no-store" if not path.startswith("/static/") else "private, max-age=300"
         response.headers["X-Content-Type-Options"]="nosniff"
         return response
