@@ -55,6 +55,28 @@ async function work(id) {
         : empty("尚未生成原文定位。")) +
       '<h3>阅读反馈</h3><div class="buttons"><button class="quiet" data-v="useful">有实质帮助</button><button class="quiet" data-v="average">一般</button><button class="quiet" data-v="irrelevant">无关</button><button class="quiet" data-v="read">标为已读</button></div><label>原因（可选）<input id="reading-reason"></label>',
   );
+  if (w.revisions.length && w.evidence.length) {
+    const form = document.createElement("form");
+    form.className = "controls";
+    form.innerHTML =
+      '<label>按问题追加精读<select name="focus"><option value="evaluation">实验与结果</option><option value="method">方法</option><option value="limits">局限与讨论</option></select></label><button class="quiet">加入章节精读</button>';
+    $("#detail-body").appendChild(form);
+    form.onsubmit = async (ev) => {
+      ev.preventDefault();
+      try {
+        const r = await send(
+          "/api/works/" +
+            encodeURIComponent(id) +
+            "/read-section/" +
+            form.elements.focus.value,
+          {},
+        );
+        msg((r.reused ? "已复用章节任务 · " : "已加入精读 · ") + r.heading);
+      } catch (err) {
+        msg(err.message);
+      }
+    };
+  }
   document.querySelectorAll("[data-v]").forEach(
     (b) =>
       (b.onclick = async () => {
