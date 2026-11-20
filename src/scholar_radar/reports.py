@@ -71,6 +71,7 @@ def export(db, rid, selected):
         else []
     )
     for a in actions:
+        a["action_id"] = a["id"]
         a["details"] = json.loads(a["details"])
     accepted = rows(
         db,
