@@ -1,0 +1,1 @@
+CREATE TABLE assessment_reviews(snapshot_id TEXT PRIMARY KEY REFERENCES snapshots(id),reviewed_at TEXT NOT NULL,verdict TEXT NOT NULL,reason TEXT NOT NULL,evidence_ids TEXT NOT NULL,model TEXT NOT NULL);
