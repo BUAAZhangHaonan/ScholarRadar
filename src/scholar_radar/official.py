@@ -167,10 +167,10 @@ async def postings(run):
                     total=page["total_chars"],
                     source_call=src,
                 )
-                db.execute(
-                    "INSERT OR IGNORE INTO postings VALUES(?,?,NULL,?,?,?,NULL)",
-                    (pid, org, u, title, now()),
-                )
+                from .posting_metadata import identify, metadata
+
+                external, published, raw_snapshot = metadata(page)
+                pid = identify(db, org, u, title, external, published)
                 linked = []
                 for m in re.finditer(r"[^\n]+", body):
                     if 15 <= len(m[0]) <= 1050 and re.search(
@@ -204,7 +204,15 @@ async def postings(run):
                         rv,
                         now(),
                         status,
-                        dump({"evidence_ids": linked, "identity": "official_url"}),
+                        dump(
+                            {
+                                "evidence_ids": linked,
+                                "identity": "official_id"
+                                if external
+                                else "official_url",
+                                "published_at": published,
+                            }
+                        ),
                     ),
                 )
                 coverage(

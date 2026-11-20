@@ -23,6 +23,7 @@ def main():
     p.add_argument("--analysis-env", type=Path, required=True)
     p.add_argument("--mirror-env", type=Path, required=True)
     p.add_argument("--trace-env", type=Path)
+    p.add_argument("--web-data-root", type=Path)
     p.add_argument("--bind", required=True)
     p.add_argument("--port", type=int, default=8769)
     p.add_argument("--nas-host", required=True)
@@ -70,6 +71,8 @@ def main():
         "port": args.port,
         "nas": {"host": args.nas_host, "user": args.nas_user, "root": args.nas_root},
     }
+    if args.web_data_root:
+        config["web_snapshot_root"] = str(args.web_data_root.resolve())
     migrate()
     with database(write=True) as db:
         save(db, profile)
