@@ -1,0 +1,10 @@
+CREATE TABLE profiles(id TEXT PRIMARY KEY, recorded_at TEXT NOT NULL, body TEXT NOT NULL);
+CREATE TABLE runs(id TEXT PRIMARY KEY, kind TEXT NOT NULL, as_of TEXT NOT NULL, profile_id TEXT REFERENCES profiles(id), scope TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, started_at TEXT, ended_at TEXT, detail TEXT NOT NULL DEFAULT '{}', UNIQUE(kind,as_of,profile_id,scope));
+CREATE TABLE jobs(id TEXT PRIMARY KEY, run_id TEXT REFERENCES runs(id), stage TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, owner TEXT, lease_at TEXT, attempts INTEGER NOT NULL DEFAULT 0, outcome TEXT);
+CREATE INDEX jobs_ready ON jobs(status,created_at);
+CREATE TABLE calls(id TEXT PRIMARY KEY, service TEXT NOT NULL, tool TEXT NOT NULL, args TEXT NOT NULL, remote_id TEXT, status TEXT NOT NULL, started_at TEXT NOT NULL, ended_at TEXT, file TEXT, error TEXT);
+CREATE TABLE run_calls(run_id TEXT NOT NULL REFERENCES runs(id), call_id TEXT NOT NULL REFERENCES calls(id), cached INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(run_id,call_id));
+CREATE TABLE receipts(id TEXT PRIMARY KEY, call_id TEXT NOT NULL REFERENCES calls(id), currency TEXT, amount REAL, lower_bound REAL, upper_bound REAL, historical REAL, usage TEXT, raw TEXT NOT NULL);
+CREATE TABLE coverage(id TEXT PRIMARY KEY, run_id TEXT REFERENCES runs(id), source TEXT NOT NULL, flow TEXT NOT NULL, scope TEXT NOT NULL, query TEXT NOT NULL, start TEXT, end TEXT, cursor TEXT, returned INTEGER, unique_count INTEGER, complete INTEGER NOT NULL DEFAULT 0, classified INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL, raw_path TEXT, reason TEXT);
+CREATE TABLE cursors(source TEXT,scope TEXT,stream TEXT,watermark TEXT,PRIMARY KEY(source,scope,stream));
+CREATE TABLE archives(id TEXT PRIMARY KEY, local_path TEXT NOT NULL, remote_path TEXT NOT NULL UNIQUE, status TEXT NOT NULL, error TEXT, archived_at TEXT);
