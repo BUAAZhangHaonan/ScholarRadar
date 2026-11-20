@@ -177,7 +177,7 @@ async def archive_run(run):
         )
         raw = rows(
             db,
-            "SELECT c.id,c.file FROM calls c JOIN run_calls rc ON rc.call_id=c.id WHERE rc.run_id=? AND c.file IS NOT NULL",
+            "SELECT c.id,c.file,c.service,c.tool FROM calls c JOIN run_calls rc ON rc.call_id=c.id WHERE rc.run_id=? AND c.file IS NOT NULL",
             (rid,),
         )
     conn = await asyncpg.connect(
@@ -232,6 +232,17 @@ async def archive_run(run):
         (path, "papers/" + vid.replace("/", "_") + ".pdf") for vid, path in pdfs.items()
     )
     objects.extend((Path(x["file"]), "sources/" + x["id"] + ".json") for x in raw)
+    from .posting_metadata import metadata
+
+    for receipt in raw:
+        if receipt["service"] == "web" and receipt["tool"] == "fetch_page":
+            relative = "sources/web/" + receipt["id"] + ".html"
+            if relative in archived:
+                continue
+            payload = json.loads(Path(receipt["file"]).read_text())
+            _, _, source = metadata(payload)
+            if source:
+                objects.append((source, relative))
     out = ROOT / "exports" / run["as_of"] / run["kind"]
     report_file = out / "internprep.json"
     edition = (
