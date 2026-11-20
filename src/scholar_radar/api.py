@@ -80,3 +80,6 @@ app.include_router(actions_router)
 
 from .operations_api import router as operations_router
 app.include_router(operations_router)
+
+from .direction_api import router as direction_router
+app.include_router(direction_router)
