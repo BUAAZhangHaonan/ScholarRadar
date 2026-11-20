@@ -74,3 +74,6 @@ def direction(did:str):
 
 from .library_api import router as library_router
 app.include_router(library_router)
+
+from .actions_api import router as actions_router
+app.include_router(actions_router)
