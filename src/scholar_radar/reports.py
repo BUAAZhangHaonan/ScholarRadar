@@ -73,11 +73,12 @@ async def publish(run):
     with database() as db:
         prof=get_profile(db,run["profile_id"])
         if kind=="daily":
-            selected=rows(db,"SELECT * FROM snapshots WHERE run_id=? ORDER BY generated_at,rowid",(rid,))
+            selected=rows(db,"SELECT s.* FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id AND a.verdict='supported' WHERE s.run_id=? ORDER BY s.generated_at,s.rowid",(rid,))
         else:
             end=day if kind=="weekly" else day.replace(day=1)-timedelta(days=1)
             start=end-timedelta(days=6) if kind=="weekly" else end.replace(day=1)
-            selected=rows(db,"""SELECT s.* FROM snapshots s JOIN runs r ON r.id=s.run_id WHERE r.as_of BETWEEN ? AND ?
+            selected=rows(db,"""SELECT s.* FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id AND a.verdict='supported'
+                                JOIN runs r ON r.id=s.run_id WHERE r.as_of BETWEEN ? AND ?
                                 ORDER BY s.generated_at DESC""",(str(start),str(end)))
         cards=[]; seen=set()
         for s in selected:
