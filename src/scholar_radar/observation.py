@@ -10,6 +10,7 @@ from .acquisition import coverage
 from .db import database,key
 from .discovery import sources
 from .evidence import arxiv_id,work
+from .queue import job
 from .settings import VAR,atomic_text,deployment,dump,now
 
 ATOM="{http://www.w3.org/2005/Atom}"
@@ -46,17 +47,23 @@ def parse_atom(text):
     return papers
 
 
-async def coordinated_stream(gateway,stream,start,end):
+async def coordinated_stream(gateway,stream,start,end,run_id):
     query=sources()["arxiv_query"]
     if stream=="submitted":
         query+=f" AND submittedDate:[{start:%Y%m%d}0000 TO {(end-timedelta(days=1)):%Y%m%d}2359]"
     order="submittedDate" if stream=="submitted" else "lastUpdatedDate"
     records=[]; offset=0
+    from .calls import invoke
     async with httpx.AsyncClient(timeout=50) as client:
+        async def atom_page(args):
+            response=await client.get(gateway,params=args)
+            response.raise_for_status()
+            return {"atom":response.text,"cost":{"basis":"no_paid_calls","total_cny":0,"lower_cny":0,"upper_cny":0,"currency":"CNY"}}
         for _ in range(25):
-            r=await client.get(gateway,params={"search_query":query,"sortBy":order,"sortOrder":"descending",
-                                              "start":offset,"max_results":100})
-            r.raise_for_status(); page=parse_atom(r.text)
+            params={"search_query":query,"sortBy":order,"sortOrder":"descending","start":offset,"max_results":100}
+            result=await invoke("arxiv","atom_page",params,identity=["arxiv-v1",sources()["scope_version"],stream,str(start),str(end)],
+                                run_id=run_id,transport=atom_page,safe=True)
+            page=parse_atom(result["atom"])
             stamp="first_version_date" if stream=="submitted" else "latest_version_date"
             records.extend(p for p in page if str(start)<=p[stamp][:10]<str(end))
             offset+=len(page)
@@ -77,7 +84,7 @@ async def observe(run):
         start=day-timedelta(days=90 if cold else 3)
         if last: start=min(day,date.fromisoformat(last[0][:10]))-timedelta(days=2)
         if gateway:
-            papers,complete,offset=await coordinated_stream(gateway,stream,start,end)
+            papers,complete,offset=await coordinated_stream(gateway,stream,start,end,rid)
             reason=None if complete else "分页达到任务上限"
         else:
             papers,sync=await mirror_window(start,end)
@@ -96,6 +103,14 @@ async def observe(run):
                 db.execute("INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (key(wid,event,stamp,version if stream=="updated" else None),wid,event,version,p.get("first_version_date"),
                      p.get("latest_version_date"),None,now(),now(),"https://arxiv.org/abs/"+p["id"]))
+                if stream=="updated" and version:
+                    tracked=db.execute("SELECT 1 FROM documents WHERE work_id=?",(wid,)).fetchone()
+                    already=db.execute("SELECT 1 FROM documents d JOIN revisions v ON v.document_id=d.id WHERE d.work_id=? AND v.version=?",(wid,version)).fetchone()
+                    if tracked and not already:
+                        versioned=p["id"]+version
+                        material={**p,"arxiv_id":versioned,"work_id":wid,"canonical_url":"https://arxiv.org/abs/"+versioned,"version_event":True}
+                        db.execute("INSERT OR IGNORE INTO readings VALUES(?,?,?,'queued','{}')",(rid,versioned,dump(material)))
+                        job(db,rid,"read",{"key":versioned})
                 if stream=="submitted":
                     db.execute("INSERT OR IGNORE INTO observed VALUES(?,?,?,?,?,NULL)",(source,scope,stamp,wid,version or "unknown"))
             coverage(db,rid,source,"observation",scope,stream,start,end,len(papers),len({p["id"] for p in papers}),
