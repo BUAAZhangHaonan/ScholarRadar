@@ -180,26 +180,53 @@ async def archive_run(run):
             "SELECT c.id,c.file,c.service,c.tool FROM calls c JOIN run_calls rc ON rc.call_id=c.id WHERE rc.run_id=? AND c.file IS NOT NULL",
             (rid,),
         )
-    conn = await asyncpg.connect(
-        deployment()["mirror_dsn"],
-        timeout=8,
-        server_settings={"default_transaction_read_only": "on"},
-    )
+    pending_versions = {
+        d["url"].split("/abs/")[-1] + d["version"]
+        for d in docs
+        if d["kind"] == "paper" and d["version"] and "/abs/" in d["url"]
+    }
+    pending_versions = {
+        v
+        for v in pending_versions
+        if "papers/" + v.replace("/", "_") + ".pdf" not in archived
+    }
     pdfs = {}
-    try:
-        for d in docs:
-            if d["kind"] == "paper" and d["version"] and "/abs/" in d["url"]:
-                vid = d["url"].split("/abs/")[-1] + d["version"]
-                if "papers/" + vid.replace("/", "_") + ".pdf" in archived:
-                    continue
+    missing = []
+    if pending_versions:
+        conn = None
+        try:
+            conn = await asyncpg.connect(
+                deployment()["mirror_dsn"],
+                timeout=8,
+                server_settings={"default_transaction_read_only": "on"},
+            )
+            for vid in sorted(pending_versions):
                 local = await conn.fetchval(
                     "SELECT local_path FROM pdf_assets WHERE versioned_id=$1 AND source='remote' AND local_path IS NOT NULL LIMIT 1",
                     vid,
                 )
                 if local and Path(local).is_file():
                     pdfs[vid] = Path(local)
-    finally:
-        await conn.close()
+                else:
+                    missing.append(vid)
+        except (OSError, TimeoutError, asyncpg.PostgresError):
+            missing.extend(sorted(pending_versions - set(pdfs) - set(missing)))
+        finally:
+            if conn is not None:
+                await conn.close()
+    if missing:
+        with database(write=True) as db:
+            for vid in missing:
+                rel = "papers/" + vid.replace("/", "_") + ".pdf"
+                db.execute(
+                    "INSERT OR IGNORE INTO archives VALUES(?,?,?,'pending',?,NULL)",
+                    (
+                        key("archive", rel),
+                        "mirror:" + vid,
+                        rel,
+                        "固定版本 PDF 尚未取得",
+                    ),
+                )
     objects = []
     uploaded_docs = 0
     for d in docs:
@@ -286,4 +313,6 @@ async def archive_run(run):
     for historic in backups[max(1, keep) :]:
         if str(historic) in retained:
             historic.unlink(missing_ok=True)
+    if missing:
+        raise ArchiveUnavailable("已完成独立归档和备份，仍有固定版本 PDF 待取得")
     return {"objects": len(objects) + uploaded_docs, "pdfs": len(pdfs), "backup": snap}
