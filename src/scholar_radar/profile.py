@@ -43,7 +43,9 @@ class Profile(BaseModel):
 
 def save(db, obj):
     body = Profile.model_validate(obj).model_dump()
-    pid = key("profile",body)
+    current=db.execute("SELECT id,body FROM profiles ORDER BY rowid DESC LIMIT 1").fetchone()
+    if current and json.loads(current["body"])==body: return current["id"]
+    pid = key("profile",current["id"] if current else None,body)
     db.execute("INSERT OR IGNORE INTO profiles VALUES(?,?,?)",(pid,now(),dump(body)))
     return pid
 
