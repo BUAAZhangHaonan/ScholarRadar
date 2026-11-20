@@ -40,11 +40,39 @@ def schedule(db,instant,limit=7):
     due=local.date() if (local.hour,local.minute)>=(hh,mm) else local.date()-timedelta(days=1)
     row=db.execute("SELECT min(as_of),max(as_of) FROM runs WHERE kind='daily'").fetchone()
     first=date.fromisoformat(row[0]) if row[0] else local.date()
-    start=max(first,due-timedelta(days=limit-1))
-    for d in (start+timedelta(days=i) for i in range(max(0,(due-start).days+1))):
-        enqueue(db,"daily",d)
-        if d.weekday()==profile["weekly_day"]: enqueue(db,"weekly",d)
-        if d.day==profile["monthly_day"]: enqueue(db,"monthly",d)
+    # Work from the earliest gap. A changed profile does not replay days
+    # already scheduled under a previous profile.
+    created=0
+    for i in range(max(0,(due-first).days+1)):
+        d=first+timedelta(days=i)
+        kinds=["daily"]
+        if d.weekday()==profile["weekly_day"]: kinds.append("weekly")
+        if d.day==profile["monthly_day"]: kinds.append("monthly")
+        for kind in kinds:
+            row=db.execute("SELECT id,status FROM runs WHERE kind=? AND as_of=? ORDER BY created_at DESC LIMIT 1",(kind,str(d))).fetchone()
+            if not row:
+                enqueue(db,kind,d); created+=1
+            elif row["status"]=="partial" and d>=due-timedelta(days=2):
+                resume(db,row["id"],automatic=True)
+        if created>=limit: break
+
+
+def resume(db,rid,automatic=False):
+    run=db.execute("SELECT id FROM runs WHERE id=?",(rid,)).fetchone()
+    if not run: raise ValueError("运行不存在")
+    changed=[]
+    for j in db.execute("SELECT * FROM jobs WHERE run_id=? AND status='failed'",(rid,)).fetchall():
+        reason=(j["outcome"] or "").lower()
+        transient=any(word in reason for word in ("timeout","connection","429","502","503","504","archiveunavailable","上游结果尚未确认"))
+        if not transient or j["attempts"]>=3: continue
+        if automatic and j["lease_at"] and (datetime.now(UTC)-datetime.fromisoformat(j["lease_at"])).total_seconds()<1800: continue
+        db.execute("UPDATE jobs SET status='queued' WHERE id=?",(j["id"],)); changed.append(j["stage"])
+    if changed:
+        db.execute("UPDATE runs SET status='queued',ended_at=NULL WHERE id=?",(rid,))
+        if any(s!="archive" for s in changed):
+            db.execute("UPDATE jobs SET status='queued' WHERE run_id=? AND stage IN ('assess','publish','archive')",(rid,))
+    return changed
+
 
 
 def take(db,owner):

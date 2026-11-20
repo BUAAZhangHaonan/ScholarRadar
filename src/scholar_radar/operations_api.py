@@ -75,3 +75,8 @@ def internprep_export():
         r=db.execute("SELECT body FROM reports ORDER BY generated_at DESC LIMIT 1").fetchone()
         if not r: raise HTTPException(404,"尚无已发布快照")
         return json.loads(r[0])
+
+@router.post("/api/runs/{rid}/resume")
+def resume_run(rid:str):
+    from .queue import resume
+    with database(write=True) as db: return {"run_id":rid,"queued_stages":resume(db,rid)}
