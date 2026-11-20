@@ -161,6 +161,11 @@ async def publish(run):
     day = date.fromisoformat(run["as_of"])
     from .shadow import refresh
 
+    if kind == "weekly":
+        from .proposal_mining import mine
+
+        await mine(run)
+
     with database(write=True) as state:
         refresh(state, rid if kind == "daily" else None)
     with database() as db:
@@ -248,6 +253,8 @@ async def publish(run):
         ).fetchone()
     if saved:
         report = json.loads(saved[0])
+        for action in report.get("proposed_actions", []):
+            action["action_id"] = action["id"]
     if not saved and kind != "daily" and cards:
         review = await ask(
             kind + "_review",
