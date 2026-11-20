@@ -11,6 +11,22 @@ QUESTION = (
 )
 
 
+def passage(body, focus):
+    patterns = {
+        "evaluation": r"main results|experiments?|evaluation|实[验証]|评估",
+        "method": r"method|approach|framework|methodology|方法",
+        "limits": r"limitations?|discussion|局限|讨论",
+    }
+    pattern = patterns.get(focus)
+    if not pattern:
+        return 0, min(11500, len(body)), None
+    for heading in re.finditer(r"(?m)^#{1,5} +(.{1,140})$", body):
+        if re.search(pattern, heading[1], re.I):
+            start = heading.start()
+            return start, min(11500, len(body) - start), heading[1]
+    return 0, min(11500, len(body)), None
+
+
 async def read_paper(paper, run_id=None):
     aid, ver = arxiv_id(
         paper.get("arxiv_id")
@@ -99,12 +115,18 @@ async def read_paper(paper, run_id=None):
                 "official_link_candidate",
                 "mentioned_in_document",
             )
+    offset, size, heading = passage(body, paper.get("evidence_focus"))
+    question = (
+        QUESTION
+        if not heading
+        else f"请核对当前原文章节《{heading}》直接给出的方法、必要对照、结果及适用条件。仅引用当前片段的连续短语，不符条件时保留未知。"
+    )
     focus = {
         "document_id": doc,
-        "question": QUESTION,
+        "question": question,
         "language": "zh",
-        "offset": 0,
-        "limit_chars": min(11500, len(body)),
+        "offset": offset,
+        "limit_chars": size,
     }
     result = await invoke(
         "analysis",
@@ -133,7 +155,7 @@ async def read_paper(paper, run_id=None):
             evidence,
             evidence,
             {
-                "question": QUESTION,
+                "question": question,
                 "coverage": analysis.get("coverage"),
                 "model": analysis.get("model_used"),
                 "revision": rid,

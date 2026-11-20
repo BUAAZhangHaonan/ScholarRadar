@@ -159,7 +159,7 @@ async def shortlist(papers, profile, limit, run_id=None):
                 )
     instr = (
         "从本次真实候选选出与研究问题最贴近、具有具体实验或可复用资源的材料。排除领域只可作为旁证。"
-        "输出 {selected:[{id,reason,theme}]}，id必须来自候选。保留少量相邻和方法上不同的材料，"
+        "输出 {selected:[{id,reason,theme,evidence_focus}]}，id必须来自候选。按问题选择 evidence_focus：evaluation、method 或 limits。保留少量相邻和方法上不同的材料，"
         "根据候选质量决定是否选满，不选重复工作。"
     )
     result = await ask(
@@ -185,6 +185,7 @@ async def shortlist(papers, profile, limit, run_id=None):
             {
                 **subset[i],
                 "selection_reason": x.get("reason"),
+                "evidence_focus": x.get("evidence_focus", "evaluation"),
                 "theme_hint": x.get("theme"),
             }
         )
