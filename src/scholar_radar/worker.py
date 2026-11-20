@@ -3,77 +3,101 @@ import fcntl
 import json
 import os
 import socket
-from datetime import datetime,UTC
+from datetime import datetime, UTC
 
-from .acquisition import collect,screen,reading,complete_cold_batch
+from .acquisition import collect, screen, reading, complete_cold_batch
 from .archive import archive_run
 from .assessment import assess
-from .db import database,migrate
+from .db import database, migrate
 from .mcp_client import inventory
 from .observation import observe
 from .official import postings
-from .queue import take,finish,schedule
+from .queue import take, finish, schedule
 from .registry import initialize
 from .reports import publish
 from .review import review
 from .corrections import revise
 from .resources import verify_resources
-from .settings import VAR,now
+from .settings import VAR, now
 
-STAGES={"discover":collect,"official":postings,"observe":observe,"screen":screen,
-        "read":reading,"complete_batch":complete_cold_batch,"assess":assess,"review":review,"revise":revise,"resources":verify_resources,"publish":publish,"archive":archive_run}
+STAGES = {
+    "discover": collect,
+    "official": postings,
+    "observe": observe,
+    "screen": screen,
+    "read": reading,
+    "complete_batch": complete_cold_batch,
+    "assess": assess,
+    "review": review,
+    "revise": revise,
+    "resources": verify_resources,
+    "publish": publish,
+    "archive": archive_run,
+}
 
 
-async def heartbeat(jid,owner):
+async def heartbeat(jid, owner):
     while True:
         await asyncio.sleep(30)
         with database(write=True) as db:
-            db.execute("UPDATE jobs SET lease_at=? WHERE id=? AND owner=? AND status='working'",(now(),jid,owner))
+            db.execute(
+                "UPDATE jobs SET lease_at=? WHERE id=? AND owner=? AND status='working'",
+                (now(), jid, owner),
+            )
 
 
-async def execute(run,job,owner):
+async def execute(run, job, owner):
     from .discovery import active_scope
-    scope_token=active_scope.set(run["scope"])
-    beat=asyncio.create_task(heartbeat(job["id"],owner))
+
+    scope_token = active_scope.set(run["scope"])
+    beat = asyncio.create_task(heartbeat(job["id"], owner))
     try:
-        if job["stage"]=="discover": await inventory()
-        handler=STAGES[job["stage"]]
-        detail=await (handler(run,json.loads(job["payload"])) if job["stage"]=="read" else handler(run))
-        ok=True
+        if job["stage"] == "discover":
+            await inventory()
+        handler = STAGES[job["stage"]]
+        detail = await (
+            handler(run, json.loads(job["payload"]))
+            if job["stage"] == "read"
+            else handler(run)
+        )
+        ok = True
     except Exception as exc:
-        detail={"error_type":type(exc).__name__,"error":str(exc)[:320]}
-        ok=False
+        detail = {"error_type": type(exc).__name__, "error": str(exc)[:320]}
+        ok = False
     finally:
         active_scope.reset(scope_token)
         beat.cancel()
-        await asyncio.gather(beat,return_exceptions=True)
-    with database(write=True) as db: finish(db,run["id"],job["id"],ok,detail)
-    print(run["id"],job["stage"],"done" if ok else "failed",flush=True)
+        await asyncio.gather(beat, return_exceptions=True)
+    with database(write=True) as db:
+        finish(db, run["id"], job["id"], ok, detail)
+    print(run["id"], job["stage"], "done" if ok else "failed", flush=True)
 
 
 async def worker(once=False):
     migrate()
-    owner=socket.gethostname()+":"+str(os.getpid())
-    with (VAR/"worker.lock").open("a+") as lock:
+    owner = socket.gethostname() + ":" + str(os.getpid())
+    with (VAR / "worker.lock").open("a+") as lock:
         while True:
             try:
-                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
             except BlockingIOError:
-                if once: return
+                if once:
+                    return
                 await asyncio.sleep(5)
-        with database(write=True) as db: initialize(db)
-        tick=None
+        with database(write=True) as db:
+            initialize(db)
+        tick = None
         while True:
-            current=datetime.now(UTC)
+            current = datetime.now(UTC)
             with database(write=True) as db:
-                minute=current.strftime("%Y%m%d%H%M")
-                if tick!=minute:
-                    schedule(db,current)
-                    tick=minute
-                pair=take(db,owner)
+                minute = current.strftime("%Y%m%d%H%M")
+                if tick != minute:
+                    schedule(db, current)
+                    tick = minute
+                pair = take(db, owner)
             if pair:
-                await execute(*pair,owner)
+                await execute(*pair, owner)
             elif once:
                 return
             else:

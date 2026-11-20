@@ -35,11 +35,16 @@ def migrate(path=None):
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("CREATE TABLE IF NOT EXISTS migrations(version TEXT PRIMARY KEY)")
         for file in sorted((ROOT / "migrations").glob("*.sql")):
-            if db.execute("SELECT 1 FROM migrations WHERE version=?", (file.name,)).fetchone():
+            if db.execute(
+                "SELECT 1 FROM migrations WHERE version=?", (file.name,)
+            ).fetchone():
                 continue
             version = file.name.replace("'", "''")
-            db.executescript("BEGIN IMMEDIATE;\n" + file.read_text() +
-                             f"\nINSERT INTO migrations VALUES('{version}');\nCOMMIT;")
+            db.executescript(
+                "BEGIN IMMEDIATE;\n"
+                + file.read_text()
+                + f"\nINSERT INTO migrations VALUES('{version}');\nCOMMIT;"
+            )
 
 
 def rows(db, sql, args=()):
