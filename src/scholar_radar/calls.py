@@ -20,17 +20,23 @@ def record_receipt(db, cid, data, recovered=False):
     cost = data.get("cost") or data.get("usage_cost") or {}
     if not isinstance(cost,dict):
         cost = {}
-    attempts = cost.get("attempts") or []
-    reused = bool(cost.get("reused_result"))
-    units = attempts or [cost]
+    reused = bool(cost.get("reused_result") or data.get("analysis_reused"))
+    original = data.get("original_cost") if reused else None
+    historical_cost = original if isinstance(original,dict) else cost
+    attempts = historical_cost.get("attempts") or []
+    units = attempts or [historical_cost]
     for i, unit in enumerate(units):
         provider_id = unit.get("request_id") or unit.get("provider_request_id")
         receipt_id = key("provider",provider_id,unit.get("model_returned")) if provider_id else key(cid,i)
+        if reused and not recovered and original:
+            receipt_id=key("historical",cid,i)
         lo, hi = _money(unit.get("lower_cny")), _money(unit.get("upper_cny"))
         amount = _money(unit.get("total_cny"))
         if amount is None and lo is not None and lo==hi:
             amount = lo
         historical = amount if reused else None
+        # A recovered local dispatch owns its original cost; a cache hit without
+        # an earlier local dispatch only exposes the upstream historical charge.
         if reused and not recovered:
             amount = lo = hi = 0.0
         db.execute("INSERT OR IGNORE INTO receipts VALUES(?,?,?,?,?,?,?,?,?)",
