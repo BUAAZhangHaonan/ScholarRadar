@@ -19,7 +19,7 @@ const names = {
   personal_feasibility: "个人可行性",
   career_match: "岗位关联",
 };
-export async function detail(id) {
+export async function detailDirection(id) {
   const d = await api("/api/directions/" + encodeURIComponent(id));
   const detail = d.snapshots
     .map((s) => {
@@ -98,6 +98,8 @@ export async function detail(id) {
       (detail || empty("正在积累可定位的证据，尚无方向快照。")) +
       "</div>",
   );
+  const { editor } = await import("./direction-editor.js");
+  await editor(d, detailDirection);
 }
 export async function render() {
   $("#app").innerHTML =
@@ -129,11 +131,11 @@ export async function render() {
         .join("") || empty("没有符合当前筛选的方向。");
     document
       .querySelectorAll("[data-dir]")
-      .forEach((b) => (b.onclick = () => detail(b.dataset.dir)));
+      .forEach((b) => (b.onclick = () => detailDirection(b.dataset.dir)));
   }
   $("#layer").onchange = load;
   $("#state").onchange = load;
   await load();
   const id = new URL(location).searchParams.get("id");
-  if (id) await detail(id);
+  if (id) await detailDirection(id);
 }
