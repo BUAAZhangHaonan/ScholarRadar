@@ -91,6 +91,8 @@ export async function render() {
       ? list(s.archive.map((x) => esc(t(x.status)) + "　" + x.count))
       : empty("暂无归档记录。")) +
     "</section></aside></div>";
+  const { controls } = await import("./research-settings.js");
+  await controls(document.querySelector("#app .stack"));
   $("#refresh").onclick = render;
   $("#launch").onclick = async () => {
     const r = await send("/api/runs", { kind: $("#mode").value });
