@@ -85,7 +85,7 @@ async def assess(run):
         papers,jobs,previous=packet(db,run)
         dirs=rows(db,"SELECT id,title,question,method,setting,layer FROM directions WHERE status!='merged'")
         profile=get_profile(db,run["profile_id"])
-        past={r[0] for r in db.execute("SELECT DISTINCT evidence_id FROM snapshot_evidence")}
+        past={r[0] for r in db.execute("SELECT evidence_id FROM assessed_inputs WHERE profile_id=? AND rule_version='evidence-v2'",(profile["id"],))}
     all_ids={eid for p in papers.values() for eid in p["quotes"]}|{j["id"] for j in jobs}
     if not papers or (previous and not all_ids-past): return {"snapshots":[],"reason":"没有新的有效证据"}
     instruction=(ROOT/"prompts/direction-assessment.txt").read_text()
@@ -128,4 +128,7 @@ async def assess(run):
         except (ValueError,KeyError,TypeError) as exc:
             rejected.append(str(exc))
     if rejected and not saved: raise ValueError("方向卡校验失败："+" / ".join(rejected))
+    with database(write=True) as db:
+        for eid in all_ids:
+            db.execute("INSERT OR IGNORE INTO assessed_inputs VALUES(?,'evidence-v2',?,?)",(profile["id"],eid,run["id"]))
     return {"snapshots":saved,"rejected":rejected}

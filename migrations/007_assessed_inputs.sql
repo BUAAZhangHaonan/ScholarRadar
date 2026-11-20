@@ -1,0 +1,1 @@
+CREATE TABLE assessed_inputs(profile_id TEXT REFERENCES profiles(id),rule_version TEXT,evidence_id TEXT REFERENCES evidence(id),run_id TEXT REFERENCES runs(id),PRIMARY KEY(profile_id,rule_version,evidence_id));
