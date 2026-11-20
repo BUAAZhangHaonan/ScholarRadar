@@ -5,7 +5,7 @@ import os
 import socket
 from datetime import datetime,UTC
 
-from .acquisition import collect,screen,reading
+from .acquisition import collect,screen,reading,complete_cold_batch
 from .archive import archive_run
 from .assessment import assess
 from .db import database,migrate
@@ -18,7 +18,7 @@ from .reports import publish
 from .settings import VAR,now
 
 STAGES={"discover":collect,"official":postings,"observe":observe,"screen":screen,
-        "read":reading,"assess":assess,"publish":publish,"archive":archive_run}
+        "read":reading,"complete_batch":complete_cold_batch,"assess":assess,"publish":publish,"archive":archive_run}
 
 
 async def heartbeat(jid,owner):

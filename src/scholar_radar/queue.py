@@ -8,7 +8,7 @@ from .discovery import sources
 from .profile import get_profile
 from .settings import dump, now
 
-ORDER=("discover","official","observe","screen","read","assess","publish","archive")
+ORDER=("discover","official","observe","screen","read","complete_batch","assess","publish","archive")
 
 
 def job(db,rid,stage,payload=None):
