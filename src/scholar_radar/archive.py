@@ -201,6 +201,7 @@ async def archive_run(run):
     finally:
         await conn.close()
     objects = []
+    uploaded_docs = 0
     for d in docs:
         file = stage / (d["id"] + ".txt")
         rel = "documents/" + file.name
@@ -208,7 +209,9 @@ async def archive_run(run):
             continue
         bound = int(deployment().get("staging_limit_bytes", 2147483648))
         size = len(d["body"].encode())
-        occupied = sum(f.stat().st_size for f in stage.iterdir() if f.is_file())
+        occupied = sum(
+            f.stat().st_size for f in stage.iterdir() if f.is_file() and f != file
+        )
         if occupied + size > bound:
             with database(write=True) as local:
                 local.execute(
@@ -222,7 +225,9 @@ async def archive_run(run):
                 )
             raise ArchiveUnavailable("本地暂存到达配置限额")
         atomic_text(file, d["body"])
-        objects.append((file, "documents/" + file.name))
+        await asyncio.to_thread(put_file, file, rel)
+        file.unlink(missing_ok=True)
+        uploaded_docs += 1
     objects.extend(
         (path, "papers/" + vid.replace("/", "_") + ".pdf") for vid, path in pdfs.items()
     )
@@ -270,4 +275,4 @@ async def archive_run(run):
     for historic in backups[max(1, keep) :]:
         if str(historic) in retained:
             historic.unlink(missing_ok=True)
-    return {"objects": len(objects), "pdfs": len(pdfs), "backup": snap}
+    return {"objects": len(objects) + uploaded_docs, "pdfs": len(pdfs), "backup": snap}
