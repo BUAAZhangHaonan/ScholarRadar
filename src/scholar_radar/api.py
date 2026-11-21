@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from .access import install
 from .db import database, rows
 from .settings import ROOT
+from .reader_api import direction_summaries, router as reader_router
 
 app = FastAPI(title="ScholarRadar", docs_url=None, redoc_url=None, openapi_url=None)
 install(app)
@@ -69,14 +70,7 @@ def daily(
 @app.get("/api/directions")
 def directions(layer: str | None = None, status: str | None = None):
     with database() as db:
-        return rows(
-            db,
-            """SELECT d.*,(SELECT count(*) FROM snapshots s WHERE s.dir_id=d.id) snapshot_count
-              FROM directions d WHERE (? IS NULL OR d.layer=?) AND (? IS NULL OR d.status=? OR EXISTS
-              (SELECT 1 FROM actions a JOIN snapshots s ON a.snapshot_id=s.id WHERE s.dir_id=d.id AND a.status=?))
-              ORDER BY snapshot_count DESC,d.rowid""",
-            (layer, layer, status, status, status),
-        )
+        return direction_summaries(db, layer, status)
 
 
 @app.get("/api/directions/{did}")
@@ -120,6 +114,7 @@ def direction(did: str):
 from .library_api import router as library_router
 
 app.include_router(library_router)
+app.include_router(reader_router)
 
 from .actions_api import router as actions_router
 
