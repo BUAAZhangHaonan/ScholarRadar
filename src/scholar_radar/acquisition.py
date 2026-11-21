@@ -2,11 +2,11 @@ import json
 from datetime import date, timedelta
 
 from .bibliography import external_key, recent_candidates, shortlist
-from .db import database, key,rows
+from .db import database, key, rows
 from .discovery import discover_papers
 from .evidence import arxiv_id, work
 from .profile import get_profile
-from .candidate_pool import remember,eligible,mark
+from .candidate_pool import remember, eligible, mark
 from .queue import job
 from .readings import read_paper
 from .settings import VAR, atomic_text, dump
@@ -106,30 +106,55 @@ async def collect(run):
             )
     except Exception as exc:
         issues.append(("ScholarTrace", str(exc)[:220]))
-    with database() as db: profile=get_profile(db,run["profile_id"])
-    if day.weekday()==profile["weekly_day"]:
+    with database() as db:
+        profile = get_profile(db, run["profile_id"])
+    if day.weekday() == profile["weekly_day"]:
         from .discovery import discover_frontier
+
         try:
-            frontier=await discover_frontier(day,rid)
+            frontier = await discover_frontier(day, rid)
             if frontier is not None:
-                materials=frontier.get("papers") or []
-                gathered.extend({**p,"discovery_layer":"frontier"} for p in materials)
+                materials = frontier.get("papers") or []
+                gathered.extend({**p, "discovery_layer": "frontier"} for p in materials)
                 with database(write=True) as db:
-                    coverage(db,rid,"ScholarTrace 前沿观察","discovery",run["scope"],"前沿与个人主线的相邻问题",
-                             day-timedelta(days=6),day,len(materials),len(materials),frontier.get("status","unknown"),
-                             reason="独立低频主题检索")
-        except Exception as exc: issues.append(("ScholarTrace 前沿观察",str(exc)[:200]))
-    def register(db,p):
-        try: ident=external_key(p)
-        except (TypeError,AttributeError): return None
-        if not ident: return None
-        p["work_id"]=work(db,p["title"],identifiers(p),p)
-        remember(db,p)
+                    coverage(
+                        db,
+                        rid,
+                        "ScholarTrace 前沿观察",
+                        "discovery",
+                        run["scope"],
+                        "前沿与个人主线的相邻问题",
+                        day - timedelta(days=6),
+                        day,
+                        len(materials),
+                        len(materials),
+                        frontier.get("status", "unknown"),
+                        reason="独立低频主题检索",
+                    )
+        except Exception as exc:
+            issues.append(("ScholarTrace 前沿观察", str(exc)[:200]))
+
+    def register(db, p):
+        try:
+            ident = external_key(p)
+        except (TypeError, AttributeError):
+            return None
+        if not ident:
+            return None
+        p["work_id"] = work(db, p["title"], identifiers(p), p)
+        remember(db, p)
         return p["work_id"]
+
     with database(write=True) as db:
-        first=[register(db,p) for p in gathered]
-        backlog=eligible(db,run["profile_id"],run["scope"],20 if cold else 3,[v for v in first if v])
-    if (cold and len(backlog)<20) or (not cold and len(backlog)<3):
+        first = [register(db, p) for p in gathered]
+        backlog = eligible(
+            db,
+            run["profile_id"],
+            run["scope"],
+            20 if cold else 3,
+            [v for v in first if v],
+        )
+    if (cold and len(backlog) < 20) or (not cold and len(backlog) < 3):
         try:
             extra, batches = await recent_candidates(day, cold, rid)
             gathered.extend(extra)
@@ -180,7 +205,7 @@ async def collect(run):
                 reason=error,
             )
         for p in items.values():
-            register(db,p)
+            register(db, p)
     atomic_text(folder(rid) / "candidates.json", dump(list(items.values())))
     if not items and issues:
         raise ValueError(str(issues))
@@ -191,26 +216,42 @@ async def screen(run):
     rid = run["id"]
     items = json.loads((folder(rid) / "candidates.json").read_text())
     cold = json.loads(run["detail"])["cold"]
-    limit=20 if cold else 3
-    with database() as db: profile=get_profile(db,run["profile_id"])
-    preferred=[p["work_id"] for p in items if p.get("work_id")]
+    limit = 20 if cold else 3
     with database() as db:
-        done=rows(db,"SELECT material FROM selection_material WHERE run_id=? ORDER BY rowid",(rid,))
-        considered=rows(db,"SELECT ci.body,c.work_id FROM candidate_decisions c JOIN candidate_inventory ci ON ci.work_id=c.work_id WHERE c.run_id=? ORDER BY c.rowid",(rid,))
-    selection=[json.loads(x["material"]) for x in done]
-    candidates=[{**json.loads(x["body"]),"work_id":x["work_id"]} for x in considered]
+        profile = get_profile(db, run["profile_id"])
+    preferred = [p["work_id"] for p in items if p.get("work_id")]
+    with database() as db:
+        done = rows(
+            db,
+            "SELECT material FROM selection_material WHERE run_id=? ORDER BY rowid",
+            (rid,),
+        )
+        considered = rows(
+            db,
+            "SELECT ci.body,c.work_id FROM candidate_decisions c JOIN candidate_inventory ci ON ci.work_id=c.work_id WHERE c.run_id=? ORDER BY c.rowid",
+            (rid,),
+        )
+    selection = [json.loads(x["material"]) for x in done]
+    candidates = [
+        {**json.loads(x["body"]), "work_id": x["work_id"]} for x in considered
+    ]
     # Alternate new discoveries and the oldest untouched work. Each considered
     # abstract advances the inventory, including when the result is empty.
-    for _ in range(max(0,(4 if cold else 2)-(len(candidates)+23)//24)):
+    for _ in range(max(0, (4 if cold else 2) - (len(candidates) + 23) // 24)):
         with database() as db:
-            batch=eligible(db,profile["id"],run["scope"],24,preferred)
-        if not batch or len(selection)>=limit: break
-        choices=await shortlist(batch,profile,limit-len(selection),rid)
+            batch = eligible(db, profile["id"], run["scope"], 24, preferred)
+        if not batch or len(selection) >= limit:
+            break
+        choices = await shortlist(batch, profile, limit - len(selection), rid)
         with database(write=True) as db:
-            mark(db,run,batch,choices)
+            mark(db, run, batch, choices)
             for p in choices:
-                db.execute("INSERT OR IGNORE INTO selection_material VALUES(?,?,?)",(rid,p["work_id"],dump(p)))
-        candidates.extend(batch); selection.extend(choices)
+                db.execute(
+                    "INSERT OR IGNORE INTO selection_material VALUES(?,?,?)",
+                    (rid, p["work_id"], dump(p)),
+                )
+        candidates.extend(batch)
+        selection.extend(choices)
     with database(write=True) as db:
         for p in selection:
             wk = external_key(p)
@@ -248,11 +289,21 @@ async def screen(run):
                 run["as_of"],
             ),
         )
-        from .recommendations import record,paper_features,baseline_contexts
-        baseline_contexts(db,rid)
+        from .recommendations import record, paper_features, baseline_contexts
+
+        baseline_contexts(db, rid)
         for p in selection:
-            record(db,"work",p["work_id"],p.get("selection_reason") or "",paper_features(p),
-                   pid=run["profile_id"],evaluation=key("baseline",rid),origin="screen",used=p.get("feedback_ids",[]))
+            record(
+                db,
+                "work",
+                p["work_id"],
+                p.get("selection_reason") or "",
+                paper_features(p),
+                pid=run["profile_id"],
+                evaluation=key("baseline", rid),
+                origin="screen",
+                used=p.get("feedback_ids", []),
+            )
     return {"selected": len(selection), "candidate_count": len(candidates)}
 
 
@@ -260,20 +311,40 @@ async def reading(run, payload):
     rid = run["id"]
     if payload.get("focus") and payload.get("work_id"):
         from .readings import analyze_revision
+
         with database() as db:
-            work_row=db.execute("SELECT metadata FROM works WHERE id=?",(payload["work_id"],)).fetchone()
-        return await analyze_revision(payload["work_id"],payload["revision_id"],payload["focus"],rid,
-             research_question=payload.get("question"),paper=json.loads(work_row[0]),required_heading=True,
-             exact_heading=payload.get("exact_heading"))
+            work_row = db.execute(
+                "SELECT metadata FROM works WHERE id=?", (payload["work_id"],)
+            ).fetchone()
+        return await analyze_revision(
+            payload["work_id"],
+            payload["revision_id"],
+            payload["focus"],
+            rid,
+            research_question=payload.get("question"),
+            paper=json.loads(work_row[0]),
+            required_heading=True,
+            exact_heading=payload.get("exact_heading"),
+        )
     wk = payload["key"]
     with database() as db:
         p = json.loads(
             db.execute(
-                "SELECT paper FROM readings WHERE run_id=? AND work_key=?", (payload.get("origin_run_id",rid), wk)
+                "SELECT paper FROM readings WHERE run_id=? AND work_key=?",
+                (payload.get("origin_run_id", rid), wk),
             ).fetchone()[0]
         )
     if payload.get("focus"):
-        return await read_paper({**p, "evidence_focus": payload["focus"],"target_revision_id":payload["revision_id"],"analysis_question":payload.get("question"),"exact_heading":payload.get("exact_heading")}, rid)
+        return await read_paper(
+            {
+                **p,
+                "evidence_focus": payload["focus"],
+                "target_revision_id": payload["revision_id"],
+                "analysis_question": payload.get("question"),
+                "exact_heading": payload.get("exact_heading"),
+            },
+            rid,
+        )
     try:
         result = await read_paper(p, rid)
     except Exception as exc:
@@ -293,5 +364,7 @@ async def reading(run, payload):
 
 async def complete_cold_batch(run):
     with database() as db:
-        count=db.execute("SELECT count(*) FROM readings WHERE run_id=?",(run["id"],)).fetchone()[0]
-    return {"selected":count,"additional":0}
+        count = db.execute(
+            "SELECT count(*) FROM readings WHERE run_id=?", (run["id"],)
+        ).fetchone()[0]
+    return {"selected": count, "additional": 0}

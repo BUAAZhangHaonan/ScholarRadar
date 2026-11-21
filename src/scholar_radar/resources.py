@@ -6,7 +6,7 @@ from .db import database, key, rows
 from .discovery import official_page
 from .evidence import revision, span
 from .settings import dump, now
-from .releases import files_at,register
+from .releases import files_at, register
 
 
 async def verify_resources(run, limit=2):
@@ -116,11 +116,25 @@ async def verify_resources(run, limit=2):
                     reason="已访问资源页，复现实验单独记录",
                 )
             try:
-                files=await files_at(url)
-                with database(write=True) as db: register(db,item["id"],files)
-            except (OSError,ValueError,KeyError,httpx.HTTPError) as exc:
+                files = await files_at(url)
                 with database(write=True) as db:
-                    coverage(db,run["id"],"发布方文件清单","discovery",run["scope"],url,day,day,None,None,"unavailable",reason=type(exc).__name__)
+                    register(db, item["id"], files)
+            except (OSError, ValueError, KeyError, httpx.HTTPError) as exc:
+                with database(write=True) as db:
+                    coverage(
+                        db,
+                        run["id"],
+                        "发布方文件清单",
+                        "discovery",
+                        run["scope"],
+                        url,
+                        day,
+                        day,
+                        None,
+                        None,
+                        "unavailable",
+                        reason=type(exc).__name__,
+                    )
             results.append(item["id"])
         except Exception as exc:
             with database(write=True) as db:
