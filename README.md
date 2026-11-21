@@ -54,7 +54,7 @@ arc_source=/home/g203/zhanghaonan/adversarial-research-copilot
 systemctl --user restart scholar-radar-api.service scholar-radar-worker.service
 ```
 
-在方向页选快照和问题后，Radar 固定画像、可用资产、引用版本和阅读笔记。ARC 数据保存在本项目的 `var/arc-research`，两个阶段共享同一个研究想法和已有笔记。阶段各自使用 ARC 现有预算配置。中断后可从研究任务恢复同一次提交。成文失败时仍可查看研究原稿。[ARC 对接协议](https://github.com/BUAAZhangHaonan/adversarial-research-copilot/blob/radar-selected-idea/docs/EXTERNAL_SELECTED_IDEAS.md)
+在方向页选快照和问题后，Radar 固定画像、可用资产、引用版本和阅读笔记。本机将 ARC 数据保存在本项目的 `var/arc-research`。部署时也可用 `--data-dir` 指定已有 ARC 档案。后续阶段沿用首次提交的运行配置、研究想法与已有笔记。阶段各自使用 ARC 现有预算配置。中断后可从研究任务恢复同一次提交。成文失败时仍可查看研究原稿。[ARC 对接协议](https://github.com/BUAAZhangHaonan/adversarial-research-copilot/blob/radar-selected-idea/docs/EXTERNAL_SELECTED_IDEAS.md)
 
 ## 数据接口
 

@@ -14,6 +14,12 @@ def main():
         "--env-file", required=True, type=Path, help="ARC service environment"
     )
     parser.add_argument("--checkout", type=Path, default=VAR / "integrations" / "arc")
+    parser.add_argument(
+        "--data-dir",
+        type=Path,
+        default=VAR / "arc-research",
+        help="用于这些想法、阶段与来源笔记的 ARC 数据目录",
+    )
     args = parser.parse_args()
     checkout = args.checkout.resolve(strict=True)
     executable = checkout / ".venv" / "bin" / "arc"
@@ -27,7 +33,7 @@ def main():
         "executable": str(executable),
         "config": str(args.config.resolve()),
         "env_file": str(args.env_file.resolve()),
-        "data_dir": str(VAR / "arc-research"),
+        "data_dir": str(args.data_dir.resolve()),
     }
     atomic_text(settings_path, dump(settings))
     print("ARC 轻量预研已关联到本机部署配置。")
