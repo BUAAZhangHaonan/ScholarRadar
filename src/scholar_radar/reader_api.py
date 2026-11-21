@@ -475,10 +475,19 @@ def paper_reading(wid: str):
         ).fetchone()
         links = rows(
             db,
-            """SELECT r.url,r.kind,wr.relation FROM work_resources wr JOIN resources r ON r.id=wr.resource_id
+            """SELECT r.id,r.url,r.kind,wr.relation FROM work_resources wr JOIN resources r ON r.id=wr.resource_id
                          WHERE wr.work_id=? ORDER BY r.url""",
             (wid,),
         )
+        for resource in links:
+            resource["files"] = rows(db, """
+                WITH versions AS (
+                    SELECT kind,path,url,last_verified_at,row_number() OVER (
+                        PARTITION BY kind,path ORDER BY last_verified_at DESC,rowid DESC
+                    ) latest FROM verified_artifacts WHERE resource_id=?
+                )
+                SELECT kind,path,url,last_verified_at FROM versions WHERE latest=1
+                ORDER BY last_verified_at DESC,kind,path""", (resource["id"],))
         related = rows(
             db,
             """SELECT DISTINCT d.id,d.title,d.question FROM directions d JOIN memberships m

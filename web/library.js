@@ -116,8 +116,12 @@ function sourceLinks(work) {
           '" rel="noopener" target="_blank">' +
           esc(r.url.replace(/^https?:\/\//, "")) +
           " ↗</a>" +
-          (r.availability_label
-            ? '<p class="sub">' + esc(r.availability_label) + "</p>"
+          (r.files?.length
+            ? '<ul class="list">' + r.files.map((file) => {
+                const kind = {code: "代码", weights: "模型权重", data: "数据文件"}[file.kind];
+                return '<li>' + esc(kind) + ' · <a target="_blank" rel="noopener" href="' +
+                  safeURL(file.url) + '">' + esc(file.path) + '</a></li>';
+              }).join("") + '</ul>'
             : "") +
           "</li>",
       )
