@@ -77,6 +77,8 @@ systemctl --user restart scholar-radar-api.service scholar-radar-worker.service
 }
 ```
 
+如需经代理访问 GitHub，可在 `github_results` 中设置 `proxy` 为本机 HTTP 代理地址。该配置只用于结果仓库的请求。
+
 4. 在本机 `var/private/github-results.env` 中写入 `SCHOLARRADAR_GITHUB_TOKEN=实际令牌`，设置文件权限为 `600`。用 `systemctl --user edit scholar-radar-worker.service` 添加以下内容，使后台 worker 能读取令牌：
 
 ```ini

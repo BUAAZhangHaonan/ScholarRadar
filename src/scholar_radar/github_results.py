@@ -211,8 +211,9 @@ async def sync(run, payload):
     if not token:
         raise ValueError("未设置 GitHub 结果仓库令牌环境变量")
     entry, body = saved_result(payload)
-    async with httpx.AsyncClient(base_url="https://api.github.com", timeout=45, headers={
+    async with httpx.AsyncClient(base_url="https://api.github.com", timeout=45,
+                                 proxy=cfg.get("proxy"), headers={
         "Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
+        "X-GitHub-Api-Version": "2022-11-28", "User-Agent": "ScholarRadar-Results",
     }) as client:
         return await commit_result(client, cfg, entry, body)
