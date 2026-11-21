@@ -17,7 +17,7 @@ document.addEventListener("click", (e) => {
 });
 try {
   const page = await import(
-    "./" + (routes[location.pathname] || (location.pathname.startsWith("/directions/")?"directions":"daily")) + ".js"
+    "./" + (routes[location.pathname] || (location.pathname.startsWith("/directions/")?"directions":location.pathname.startsWith("/works/")?"library":"daily")) + ".js"
   );
   await page.render();
 } catch (err) {
