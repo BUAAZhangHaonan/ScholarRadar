@@ -96,19 +96,34 @@ def validate_card(card, papers, jobs):
     for h in card.get("history", []):
         wid = h.get("work_id")
         refs = h.get("evidence_ids") or []
-        if (
-            wid not in works
-            or not refs
-            or not set(refs) <= papers[wid]["quotes"].keys()
-        ):
-            continue
+        if wid not in works or not refs:
+            raise ValueError("历史事项缺少有效作品及引文")
         p = papers[wid]
+        role = h.get("version_role", "current")
+        ref_revision = p.get("revision_id")
+        ref_version = p.get("version")
+        if role == "historical_comparison":
+            old = [
+                r
+                for r in p.get("historical_comparison", [])
+                if r["revision_id"] == h.get("revision_id")
+            ]
+            if not old or not set(refs) <= {
+                eid for rec in old for eid in rec["quotes"]
+            }:
+                raise ValueError("历史比较没有指向输入中的明确旧修订")
+            ref_revision, ref_version = old[0]["revision_id"], old[0]["version"]
+        elif role != "current" or not set(refs) <= p["quotes"].keys():
+            raise ValueError("当前结果混入其他修订的引文")
         published = p["date"] or (str(p["year"]) if p["year"] else None)
         timeline.append(
             {
                 "work_id": wid,
                 "date": published,
                 "first_observed": p["first_seen"],
+                "version_role": role,
+                "revision_id": ref_revision,
+                "version": ref_version,
                 "event": str(h.get("event") or "")[:500],
                 "evidence_ids": refs,
             }
@@ -220,6 +235,13 @@ def persist_card(db, run, profile, card, ids, works, papers, sig):
                 db.execute(
                     "INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",
                     (sid, record["id"]),
+                )
+    for wid in works:
+        for old_note in papers[wid].get("historical_comparison", []):
+            if set(old_note["quotes"]) & set(ids):
+                db.execute(
+                    "INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",
+                    (sid, old_note["record_id"]),
                 )
     for eid in refs:
         db.execute(

@@ -10,6 +10,11 @@ def label_inputs(papers, jobs):
         for n, record in enumerate(p.get("reading_records", []), 1):
             forward[record["id"]] = f"W{i}R{n}"
             forward[record["revision_id"]] = f"W{i}V"
+        for n, old in enumerate(p.get("historical_comparison", []), 1):
+            forward[old["record_id"]] = f"W{i}O{n}"
+            forward.setdefault(old["revision_id"], f"W{i}OV{n}")
+            for j, eid in enumerate(old["quotes"], 1):
+                forward.setdefault(eid, f"W{i}O{n}E{j}")
         for n, artifact in enumerate(p.get("artifacts", []), 1):
             forward[artifact["evidence_id"]] = f"W{i}A{n}"
         for j, eid in enumerate(p["quotes"], 1):

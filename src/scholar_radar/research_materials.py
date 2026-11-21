@@ -136,20 +136,44 @@ def paper_material(db, wid, cutoff, priority_record_ids=()):
         ):
             paper["quotes"][ev["id"]] = ev["quote"]
             paper["quote_roles"][ev["id"]] = ev["stance"]
-    older = [
-        r for r in records if r["id"] in priority_record_ids and r["revision_id"] != rev
-    ]
+    previous_records = [r for r in records if r["revision_id"] != rev]
+    pinned = set(priority_record_ids)
+    older = [r for r in previous_records if r["id"] in pinned]
+    if previous_records and pinned.intersection(r["id"] for r in active):
+        prior_revision = previous_records[0]["revision_id"]
+        older.extend(
+            r
+            for r in previous_records
+            if r["revision_id"] == prior_revision and r not in older
+        )
     if older:
-        paper["historical_comparison"] = [
-            {
-                "version": r["version"],
-                "revision_id": r["revision_id"],
-                "question": r["question"],
-                "answer": r["answer"],
-                "role": "旧修订对照，不作为当前版本的结果",
+        comparisons = []
+        for r in older:
+            original = db.execute(
+                "SELECT body FROM revisions WHERE id=?", (r["revision_id"],)
+            ).fetchone()[0]
+            evidence = {
+                row["id"]: row["quote"]
+                for row in db.execute(
+                    "SELECT e.id,e.quote FROM evidence e JOIN claim_evidence ce ON ce.evidence_id=e.id WHERE ce.claim_id=? AND e.revision_id=?",
+                    (r["id"], r["revision_id"]),
+                )
             }
-            for r in older
-        ]
+            comparisons.append(
+                {
+                    "record_id": r["id"],
+                    "version": r["version"],
+                    "revision_id": r["revision_id"],
+                    "question": r["question"],
+                    "answer": r["answer"],
+                    "quotes": evidence,
+                    "current_quotes_absent_verbatim_from_old_parse": [
+                        eid for eid, q in paper["quotes"].items() if q not in original
+                    ],
+                    "role": "明确的旧修订参照；措辞差异需要结合实验条件判断。",
+                }
+            )
+        paper["historical_comparison"] = comparisons
     paper["resources"] = rows(
         db,
         """SELECT res.id,res.url,o.status,o.observed_at,o.revision_id,o.details,e.quote
@@ -237,6 +261,7 @@ def signature(direction, profile, scope, papers, jobs, versions, results):
             wid,
             p["revision_id"],
             sorted(r["id"] for r in p["reading_records"]),
+            sorted(r["record_id"] for r in p.get("historical_comparison", [])),
             [
                 (r["id"], r["status"], r["revision_id"], r["details"])
                 for r in p["resources"]
