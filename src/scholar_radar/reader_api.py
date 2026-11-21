@@ -410,6 +410,14 @@ def direction_reading(did: str, snapshot: str | None = None):
             apply_editorial(current, editorial_for_snapshot(db, selected["id"]))
             current.update(
                 selected_at=selected["generated_at"],
+                reassessments=rows(
+                    db,
+                    """
+                    SELECT n.reasoning,i.checked_at FROM reassessment_notes n
+                    JOIN direction_assessment_inputs i USING(direction_id,profile_id,signature)
+                    WHERE n.snapshot_id=? ORDER BY i.checked_at DESC LIMIT 4""",
+                    (selected["id"],),
+                ),
                 verdict=selected["verdict"],
                 open_issue=selected["reason"]
                 if selected["verdict"] != "supported"

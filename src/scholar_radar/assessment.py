@@ -459,6 +459,19 @@ async def assess(run, direction_ids=None):
                     "INSERT OR IGNORE INTO direction_assessment_inputs VALUES(?,?,?,?,?)",
                     (target, profile["id"], sig, run["id"], now()),
                 )
+                reason = data.get("no_change_reason")
+                if not candidates and isinstance(reason, str) and reason.strip():
+                    db.execute(
+                        "INSERT OR IGNORE INTO reassessment_notes VALUES(?,?,?,?,?,?)",
+                        (
+                            target,
+                            profile["id"],
+                            sig,
+                            old["snapshot_id"] if old else None,
+                            reason.strip(),
+                            dump([e["id"] for e in trigger]),
+                        ),
+                    )
         if errors:
             failed_event_ids.update(e["id"] for e in trigger)
             rejected.extend(errors)

@@ -174,6 +174,11 @@ async function detail(id, sid) {
     (supported ? "当前认识" : "仍待回答的问题") +
     "</h2>" +
     opening +
+    (cur?.reassessments?.length
+      ? '<details class="source-fold"><summary>补查之后，为什么保持当前判断</summary><ul class="list">' +
+        cur.reassessments.map((r) => '<li><span class="sub">' + esc(humanDate(r.checked_at)) + '</span>' +
+          prose(r.reasoning) + '</li>').join("") + '</ul></details>'
+      : "") +
     "</section>" +
     '<section class="feature-story"><h2>可以推进的研究切口</h2><div class="story-body">' +
     entry +
