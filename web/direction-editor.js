@@ -1,9 +1,9 @@
 import { $, api, esc, send, msg } from "./common.js";
-export async function editor(d, open) {
+export async function editor(d, open, container) {
   const panel = document.createElement("details");
   panel.innerHTML =
-    '<summary>管理名称、合并与拆分</summary><form class="form"><label>操作<select name="operation"><option value="rename">更名</option><option value="merge">提议合并</option><option value="split">提议拆分</option></select></label><div data-fields></div><button>保存</button></form><div data-pending></div>';
-  $("#detail-body").appendChild(panel);
+    '<summary>更多 · 管理方向</summary><form class="form"><label>操作<select name="operation"><option value="rename">更名</option><option value="merge">提议合并</option><option value="split">提议拆分</option></select></label><div data-fields></div><button>保存</button></form><div data-pending></div>';
+  container.appendChild(panel);
   const form = $("form", panel),
     fields = $("[data-fields]", panel);
   async function change() {
