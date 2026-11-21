@@ -70,4 +70,4 @@ systemctl --user restart scholar-radar-api.service scholar-radar-worker.service
 .venv/bin/python -B -m unittest discover -s tests -v
 ```
 
-[首版真实验收](docs/acceptance.md) · [实际环境](docs/environment.md) · [MCP 能力目录](docs/capabilities.json) · [来源与计算口径](docs/source_contracts.md)
+[阅读与 ARC 验收](docs/refactor-acceptance.md) · [首版真实验收](docs/acceptance.md) · [实际环境](docs/environment.md) · [MCP 能力目录](docs/capabilities.json) · [来源与计算口径](docs/source_contracts.md)
