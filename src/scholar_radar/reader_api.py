@@ -165,7 +165,8 @@ def project_report(db, kind, selected_date):
     updates=[u for u in updates if u.get("work_id") not in used][:3]
     evolution=[{"direction_id":d.get("direction_id"),"title":d.get("title"),
                 "nodes":[{"snapshot_id":n.get("snapshot_id"),"date":n.get("date"),"judgment":n.get("judgment"),
-                          "change":n.get("change"),"verdict":n.get("verdict"),"evidence_ids":n.get("evidence_ids",[]),
+                          "change":n.get("change"),"verdict":n.get("verdict"),"baseline":bool(n.get("baseline")),
+                          "open_issue":n.get("open_issue"),"evidence_ids":n.get("evidence_ids",[]),
                           "actions":n.get("actions",[]),"feedback":n.get("feedback",[])} for n in d.get("nodes",[])]}
                for d in report.get("evolution",[])]
     return {
