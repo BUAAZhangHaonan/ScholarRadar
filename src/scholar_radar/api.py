@@ -35,6 +35,19 @@ def page():
     return FileResponse(ROOT / "web/index.html")
 
 
+@app.get("/directions/{did}")
+@app.get("/works/{did}")
+@app.get("/tasks/{did}")
+def reading_page(did: str):
+    return page()
+
+
+@app.get("/tasks")
+@app.get("/maintenance")
+def workspace_page():
+    return page()
+
+
 def one(db, sql, params=()):
     row = db.execute(sql, params).fetchone()
     if not row:

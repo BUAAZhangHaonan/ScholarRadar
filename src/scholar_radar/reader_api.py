@@ -137,3 +137,61 @@ def project_report(db, kind, selected_date):
 def reading_report(date: date | None = None, kind: Literal["daily","weekly","monthly"]="daily"):
     with database() as db:
         return project_report(db,kind,date)
+
+
+@router.get("/api/reading/directions/{did}")
+def direction_reading(did: str, snapshot: str | None = None):
+    with database() as db:
+        direction=db.execute("SELECT * FROM directions WHERE id=?", (did,)).fetchone()
+        if not direction:
+            raise HTTPException(404,"没有找到这个方向")
+        snapshots=rows(db,"""SELECT s.id,s.generated_at,s.body,ar.verdict,ar.reason
+            FROM snapshots s LEFT JOIN assessment_reviews ar ON ar.snapshot_id=s.id
+            WHERE s.dir_id=? ORDER BY s.generated_at DESC,s.rowid DESC""",(did,))
+        selected = next((s for s in snapshots if s["id"]==snapshot),None) if snapshot else next(
+            (s for s in snapshots if s["verdict"]=="supported"), snapshots[0] if snapshots else None)
+        if snapshot and not selected:
+            raise HTTPException(404,"这个快照不属于当前方向")
+        timeline=[]
+        for s in snapshots:
+            card=json.loads(s["body"])
+            timeline.append({"snapshot_id":s["id"],"date":s["generated_at"],"verdict":s["verdict"],
+                             "change":card.get("change") if s["verdict"]=="supported" else None,
+                             "question":card.get("question"),"open_issue":s["reason"] if s["verdict"]!="supported" else None})
+        current=None
+        if selected:
+            body=json.loads(selected["body"])
+            current=card_excerpt(db,did,selected["id"],body)
+            current.update(selected_at=selected["generated_at"],verdict=selected["verdict"],
+                open_issue=selected["reason"] if selected["verdict"]!="supported" else None,
+                history=body.get("history") or [],nearest=body.get("nearest"),
+                feasibility=body.get("feasibility"),forecast=body.get("forecast"),
+                career=body.get("job_match"),action=body.get("action"),resources=body.get("resources"),
+                limitation=body.get("limitation"),method=body.get("method"),setting=body.get("setting"))
+        return {**dict(direction),"current":current,"timeline":timeline,"followed":follow_state(db,did),
+                "relations":rows(db,"SELECT * FROM direction_relations WHERE from_id=? OR to_id=?",(did,did))}
+
+
+@router.get("/api/reading/works/{wid}")
+def paper_reading(wid: str):
+    from .record_store import work_records
+    with database() as db:
+        work=db.execute("SELECT title,metadata FROM works WHERE id=?",(wid,)).fetchone()
+        if work is None:
+            raise HTTPException(404,"没有找到这篇文献")
+        metadata=json.loads(work["metadata"])
+        records=work_records(db,wid)
+        seen=set()
+        readable=[]
+        for rec in records:
+            readable.append({k:rec[k] for k in ("id","revision_id","version","focus","heading","answer","sections","evidence_ids")})
+            seen.update(rec["evidence_ids"])
+        revision=db.execute("SELECT url FROM documents WHERE work_id=? AND kind='paper' ORDER BY rowid DESC LIMIT 1",(wid,)).fetchone()
+        links=rows(db,"""SELECT r.url,r.kind,wr.relation FROM work_resources wr JOIN resources r ON r.id=wr.resource_id
+                         WHERE wr.work_id=? ORDER BY r.url""",(wid,))
+        related=rows(db,"""SELECT DISTINCT d.id,d.title,d.question FROM directions d JOIN memberships m
+                       ON d.id=m.direction_id WHERE m.work_id=? AND d.status!='merged' ORDER BY d.title""",(wid,))
+        return {"id":wid,"title":work["title"],"url":metadata.get("canonical_url") or (revision[0] if revision else None),
+                "date":metadata.get("published_date") or metadata.get("year"),
+                "abstract":metadata.get("abstract"),"records":readable,"resources":links,
+                "directions":related,"evidence":evidence_rows(db,list(seen))}
