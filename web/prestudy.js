@@ -84,9 +84,13 @@ function sourceList(task) {
     const entry = groups.get(key) || {
       source: s,
       levels: new Set(),
+      notes: new Map(),
       cited: false,
     };
     if (cited.has(s.source_id)) entry.cited = true;
+    for (const note of s.source_notes || []) {
+      if (typeof note.finding === "string" && note.finding.trim()) entry.notes.set(note.finding, note);
+    }
     for (const l of [s.reading_level, ...(s.read_levels || [])])
       if (readingLevels[l]) entry.levels.add(readingLevels[l]);
     groups.set(key, entry);
@@ -95,7 +99,7 @@ function sourceList(task) {
     return (
       '<ul class="list">' +
       items
-        .map(({ source: s, levels }) => {
+        .map(({ source: s, levels, notes, cited }) => {
           const version =
             s.version == null
               ? ""
@@ -115,7 +119,12 @@ function sourceList(task) {
               : esc(s.title || "引用材料")) +
             '<p class="sub">' +
             esc([version, ...levels].filter(Boolean).join(" · ")) +
-            "</p></li>"
+            "</p>" +
+            (cited && notes.size
+              ? '<details><summary>已保存的来源笔记</summary>' + [...notes.values()].map(n =>
+                  prose(n.finding) + (n.limits ? prose(n.limits) : "")
+                ).join("") + "</details>"
+              : "") + "</li>"
           );
         })
         .join("") +
