@@ -276,6 +276,19 @@ async def archive_run(run):
             _, _, source = metadata(payload)
             if source:
                 objects.append((source, relative))
+    with database() as db:
+        prestudies = rows(
+            db,
+            """
+            SELECT h.id,h.result_json FROM arc_handoffs h
+            WHERE h.status='completed' AND h.result_json IS NOT NULL
+              AND NOT EXISTS(SELECT 1 FROM archives a WHERE a.status='archived'
+                AND a.remote_path='reports/arc/'||h.id||'/stage.json')""",
+        )
+    for study in prestudies:
+        path = stage / ("arc-" + study["id"] + ".json")
+        atomic_text(path, study["result_json"])
+        objects.append((path, "reports/arc/" + study["id"] + "/stage.json"))
     report_kind = "daily" if run["kind"] == "research_update" else run["kind"]
     out = ROOT / "exports" / run["as_of"] / report_kind
     report_file = out / "internprep.json"
