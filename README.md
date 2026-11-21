@@ -1,6 +1,6 @@
 # ScholarRadar
 
-ScholarRadar 把论文、开放资源和官方岗位放回各自的研究问题中。日报记录本次判断发生的变化，并给出研究历史、原文位置、可证伪的预测与下一步。周报从同一批证据中选出精读和小验证，月报汇总方向变化与真实反馈。
+ScholarRadar 为研究者整理值得跟进的论文变化。日报解释新材料怎样改变先前的判断，再把个人研究切口和下一步放在一起。论文记录保留读过的版本、实验与原文。进入方向后，可以让 ARC 查最近邻、展开方案，再检查一个决定是否值得继续的前提。
 
 ## 在 g203 使用
 
@@ -16,11 +16,11 @@ systemctl --user status scholar-radar-api.service scholar-radar-worker.service
 
 `login-link` 打印内网设备入口。新链接三天内可以使用一次，登录后的浏览器会话有效期为三十天。书签保存工作台首页即可。日任务在北京时间每天 07:30 启动，含周末。周日生成周报，每月 1 日复盘上一个自然月。离线期间遗漏的日期由同一 worker 补跑。手工和定时触发共用唯一队列。
 
-- **今日变化**查看历史证据与新判断，逐条打开原文，切换日、周、月报告。
-- **方向库**查看近邻、因子、适用条件、历史名称和判断快照。分类变更保留关系，合并或拆分另行确认。
-- **证据库**查论文、代码、团队与岗位，从引文跳到具体修订。个人阅读价值和已读状态分别记录。
-- **行动与反馈**可接受、暂缓、开始或完成行动，记录原因、实际投入和结果。在相同候选集上盲评不同推荐。
-- **设置与运行**管理画像、模型角色、时区、采集范围、候选因子和手工任务，查看实际调用和异常原因。
+- **日报、周报与月报**按日期阅读。首页优先展示一项完整变化，其他材料可独立作为论文动态。周报可展开期初判断、期间的支持或反例、仍待解决的问题和建议行动。
+- **研究方向**提供独立地址。选择一个历史快照可以看到当时的判断；查看原文后关闭引文抽屉，即可回到原位置。“展开研究方案”和“检查关键前提”各启动一次 ARC 轻量预研，方向页及“研究任务”都可查看结果和技术分析。
+- **文献**可以按版本查阅问题、方法、对照、实验条件和待补问题。点击“继续补读”可指定实际章节与一个具体问题。资源区链接到作者仓库及已核实的具体文件。
+- **反馈和行动**附在对应论文或方向旁。可以记录一次推荐哪里有用、哪里与当前问题无关，也可以在行动完成后留下实际结果。阅读状态、关注和暂缓各自保存。
+- **设置与运行**保留个人画像、采集时间、后台任务、用量与来源覆盖。内网访问需先用一次性登录链接建立浏览器会话。
 
 ## 部署与恢复
 
@@ -43,7 +43,22 @@ bash scripts/install-services.sh
 
 备份名标识一次固定快照，重用名称会返回已归档的版本。恢复命令写入新的本地文件，并检查数据库完整性、外键、作品、证据关系与任务。验证恢复库可通过 `SCHOLARRADAR_DATA_DIR` 指向项目内独立数据目录；工作数据库名为 `scholar_radar.sqlite`。切换生产库前先停止 API 与 worker，保留当前数据库和 WAL，核对恢复副本后再执行明确的切换。数据库采用本机 WAL，网络存储只承载版本化对象和一致性备份。暂存上限 `staging_limit_bytes` 默认 2 GiB，`local_backup_count` 默认保留最近 7 份本地备份，清理前检查 NAS 归档状态。
 
+## 接入 ARC 轻量预研
+
+在已配置 ScholarRadar 的项目根目录执行以下命令。脚本将 ARC 的轻量对接版本安装在项目的 `var/integrations/arc`，并使用已有 ARC 服务配置读取模型和研究工具。
+
+```bash
+bash scripts/install-arc.sh
+arc_source=/home/g203/zhanghaonan/adversarial-research-copilot
+.venv/bin/python scripts/configure-arc.py --config "$arc_source/configs/runtime.yaml" --env-file "$arc_source/.env"
+systemctl --user restart scholar-radar-api.service scholar-radar-worker.service
+```
+
+在方向页选快照和问题后，Radar 固定画像、可用资产、引用版本和阅读笔记。ARC 数据保存在本项目的 `var/arc-research`，两个阶段共享同一个研究想法和已有笔记。阶段各自使用 ARC 现有预算配置。中断后可从研究任务恢复同一次提交。成文失败时仍可查看研究原稿。[ARC 对接协议](https://github.com/BUAAZhangHaonan/adversarial-research-copilot/blob/radar-selected-idea/docs/EXTERNAL_SELECTED_IDEAS.md)
+
 ## 数据接口
+
+`GET /api/reading/report` 接受 `kind` 与 `date`。方向和文献的阅读视图分别位于 `/api/reading/directions/{id}` 与 `/api/reading/works/{id}`。提交 `POST /api/directions/{id}/prestudies` 后可以用 `GET /api/prestudies/{id}` 查询状态、中文正文、技术分析及其来源；不同阶段通过返回的 ARC idea ID 承接。
 
 `GET /api/daily`、`/api/directions`、`/api/works/{id}`、`/api/evidence/{id}`、`/api/actions`、`/api/runs` 和 `/api/profile` 使用浏览器会话鉴权。`POST /api/runs` 返回任务 ID，`POST /api/runs/{id}/resume` 恢复符合重试条件的阶段。已发送的付费调用优先恢复原来的上游 ID。来源收据包含历史费用时，账本区分历史数值和本次增量。
 
