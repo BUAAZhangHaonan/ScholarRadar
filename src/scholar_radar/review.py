@@ -42,7 +42,8 @@ async def review(run):
                     "history": b["history"],
                     "nearest": b["nearest"],
                     "hypothesis": b["forecast"],
-                    "job": b.get("job_match"),
+                    "job": b.get("job_match"),"resources":b.get("resources"),"personal_feasibility":b.get("feasibility"),
+                    "action":b.get("action"),"user_compute_conditions":profile["compute"],
                     "evidence": evidence,
                 }
             )
@@ -51,7 +52,7 @@ async def review(run):
     data = await ask(
         "entailment_review",
         profile["strong_model"],
-        "逐卡独立复核。核对事实是否有给定原文依据、数据集与指标是否一致、岗位是否来自官方要求。"
+        "逐卡独立复核。核对事实是否有给定原文依据、数据集与指标是否一致、岗位是否来自官方要求。研究资源的可安排程度以画像明确记录为准，条件性资源的方案保留前提。"
         "假设和未来判定条件应与已发生事实区分。仅因未来结果未知不能否定一个有根据的可证伪假设。"
         "每项返回 {id,verdict,reason,gap}，id=C1等。verdict取 supported 或 needs_evidence。"
         "已支持填 gap=null。需要修改时 gap={kind,question,anchor,neighbor}；"

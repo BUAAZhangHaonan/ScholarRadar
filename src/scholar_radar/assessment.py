@@ -309,6 +309,11 @@ async def assess(run,direction_ids=None):
                 db.execute("SAVEPOINT proposed_card")
                 try:
                     if card.get("direction_id")!=(target or "new"): raise ValueError("方向卡超出本次评估对象")
+                    nearest=card.get("nearest")
+                    if isinstance(nearest,list) and nearest and all(isinstance(n,dict) and n.get("work_id") in papers
+                            and all(isinstance(n.get(k),str) and n[k].strip() for k in ("title","similarity","difference")) for n in nearest):
+                        card["nearest_works"]=nearest
+                        card["nearest"]=nearest[0]
                     if not isinstance(card.get("nearest"),dict): raise ValueError("新增方向卡需要结构化的最近邻比较")
                     ids,works=validate_card(card,papers,jobs)
                     sid,did=persist_card(db,run,profile,card,ids,works,papers,sig)
