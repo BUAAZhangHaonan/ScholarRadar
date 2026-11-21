@@ -1,4 +1,5 @@
 """Connect an installed ARC CLI to this Radar deployment."""
+
 import argparse
 import json
 from pathlib import Path
@@ -9,7 +10,9 @@ from scholar_radar.settings import PRIVATE, VAR, atomic_text, dump
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True, type=Path, help="ARC runtime.yaml")
-    parser.add_argument("--env-file", required=True, type=Path, help="ARC service environment")
+    parser.add_argument(
+        "--env-file", required=True, type=Path, help="ARC service environment"
+    )
     parser.add_argument("--checkout", type=Path, default=VAR / "integrations" / "arc")
     args = parser.parse_args()
     checkout = args.checkout.resolve(strict=True)
