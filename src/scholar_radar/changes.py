@@ -99,4 +99,10 @@ def research_outcomes(db,did):
             "decision":result.get("research_decision"),"evidence_limited":result.get("evidence_limited"),
             "sources":[{"id":v["source_id"],"title":v.get("title"),"url":v.get("url"),"level":v.get("reading_level")} for v in result.get("source_directory",[])],
             "at":row["updated_at"]})
+    published=rows(db,"""SELECT DISTINCT a.id,a.kind,a.path,a.url,a.version,a.evidence_id,a.first_verified_at
+        FROM verified_artifacts a JOIN work_resources wr ON wr.resource_id=a.resource_id
+        WHERE wr.work_id IN (SELECT work_id FROM memberships WHERE direction_id=? UNION
+        SELECT rr.work_id FROM reading_records rr JOIN reading_record_directions rd ON rd.record_id=rr.id WHERE rd.direction_id=?)
+        ORDER BY a.first_verified_at DESC LIMIT 12""",(did,did))
+    outcomes.extend({"kind":"publisher_file","file":p,"interpretation":"已核验具体文件；复现结果须另行登记"} for p in published)
     return outcomes

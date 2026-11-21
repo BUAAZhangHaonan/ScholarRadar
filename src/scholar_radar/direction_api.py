@@ -91,4 +91,6 @@ def confirm(ident: str):
         )
         # Membership in old snapshots remains historical; both windows need the new taxonomy.
         db.execute("UPDATE coverage SET classified=0 WHERE flow='observation'")
+        from .changes import invalidate
+        invalidate(db,"definition",r["to_id"],ident,[r["to_id"]])
         return {"id": ident, "status": "confirmed"}
