@@ -128,7 +128,7 @@ def work_records(db, wid, revision_id=None, cutoff=None):
         db,
         """SELECT r.id,r.work_id,r.revision_id,r.id claim_id,r.analysis_id,
        r.question,r.focus,r.heading,r.recorded_at,r.sections,r.topic,r.start,r.end,
-       v.total_chars,v.version,c.statement answer FROM reading_records r JOIN revisions v ON v.id=r.revision_id
+       v.total_chars,v.version,v.document_id,v.observed_at revision_observed_at,d.url source_url,c.statement answer FROM reading_records r JOIN revisions v ON v.id=r.revision_id JOIN documents d ON d.id=v.document_id
        JOIN claims c ON c.id=r.id WHERE r.work_id=? AND (? IS NULL OR r.revision_id=?)
        AND (? IS NULL OR r.recorded_at<=?) ORDER BY
        CAST(substr(coalesce(v.version,'v0'),2) AS INTEGER) DESC,v.observed_at DESC,r.recorded_at DESC,r.rowid DESC""",

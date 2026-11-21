@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import tempfile
 import unittest
 from datetime import date
@@ -70,7 +71,9 @@ def answer(role, model, instruction, inputs, run_id, **kwargs):
 
 class Records(unittest.TestCase):
     def setUp(self):
-        scratch = ROOT / "_scratch" / "evidence2" / "tmp"
+        scratch = Path(os.environ.get("TMPDIR") or ROOT / "_scratch" / "tmp").resolve()
+        if not scratch.is_relative_to(ROOT / "_scratch"):
+            scratch = ROOT / "_scratch" / "tmp"
         scratch.mkdir(parents=True, exist_ok=True)
         temp = tempfile.TemporaryDirectory(dir=scratch)
         self.addCleanup(temp.cleanup)

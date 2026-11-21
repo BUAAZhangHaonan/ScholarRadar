@@ -103,6 +103,14 @@ def paper_material(db, wid, cutoff, priority_record_ids=()):
     records = work_records(db, wid, cutoff=cutoff)
     if not records:
         return None
+    # Version numbers are comparable within a document lineage. A publisher's
+    # unnumbered revision and an arXiv v2 do not define a relative version.
+    preferred = [r for r in records if r["id"] in priority_record_ids]
+    chosen_source = max(
+        preferred or records,
+        key=lambda r: (r["revision_observed_at"], r["recorded_at"], r["id"]),
+    )["document_id"]
+    records = [r for r in records if r["document_id"] == chosen_source]
     rev = records[0]["revision_id"]
     active = [r for r in records if r["revision_id"] == rev]
     work = db.execute("SELECT * FROM works WHERE id=?", (wid,)).fetchone()
@@ -120,6 +128,7 @@ def paper_material(db, wid, cutoff, priority_record_ids=()):
         "title": work["title"],
         "version": active[0]["version"],
         "revision_id": rev,
+        "source_url": active[0]["source_url"],
         "date": meta.get("published_date"),
         "year": meta.get("year"),
         "first_seen": work["first_seen"],
