@@ -70,6 +70,23 @@ def card_excerpt(db, direction_id, snapshot_id, card, evidence=None, action=None
     }
 
 
+def apply_editorial(item, entry):
+    for source, target in (("title","title"),("change","change"),("personal_connection","personal_fit"),("next_step","next_step")):
+        value=entry.get(source)
+        if isinstance(value,str) and value.strip():
+            item[target]=value
+    if entry.get("personal_connection"):
+        item["edited_personal_connection"]=True
+    return item
+
+
+def editorial_for_snapshot(db,snapshot_id):
+    row=db.execute("""SELECT entry.value FROM snapshots s JOIN reports r ON r.run_id=s.run_id AND r.kind='daily'
+           JOIN json_each(r.body,'$.editorial.items') entry ON json_extract(entry.value,'$.snapshot_id')=s.id
+           WHERE s.id=? ORDER BY r.generated_at DESC LIMIT 1""",(snapshot_id,)).fetchone()
+    return json.loads(row[0]) if row else {}
+
+
 def direction_summaries(db, layer=None, status=None):
     result = []
     directions = rows(db, """SELECT d.*,(SELECT count(*) FROM snapshots s WHERE s.dir_id=d.id) snapshot_count
@@ -83,6 +100,7 @@ def direction_summaries(db, layer=None, status=None):
         approved = next((s for s in snapshots if s["verdict"] == "supported"), None)
         latest = snapshots[0] if snapshots else None
         projection = card_excerpt(db, d["id"], approved["id"], json.loads(approved["body"])) if approved else {}
+        if approved: apply_editorial(projection,editorial_for_snapshot(db,approved["id"]))
         d.update(
             latest_snapshot_id=approved["id"] if approved else (latest["id"] if latest else None),
             latest_judgment=projection.get("judgment"), latest_change=projection.get("change"),
@@ -115,11 +133,14 @@ def project_report(db, kind, selected_date):
     report = json.loads(row["body"])
     evidence = {e["id"]:e for e in report.get("evidence",[]) if e.get("id")}
     actions = {a.get("snapshot_id"):a for a in report.get("proposed_actions",[])}
+    editorial=(report.get("editorial") or {}) if kind=="daily" else {}
+    edits={e["snapshot_id"]:e for e in editorial.get("items",[]) if e.get("snapshot_id")}
     items=[]
     for snapshot in report.get("directions",[]):
         sid = snapshot["id"]
         relevant = [evidence[i] for i in snapshot.get("evidence_ids",[]) if i in evidence]
-        items.append(card_excerpt(db,snapshot["direction_id"],sid,snapshot["card"],relevant,actions.get(sid)))
+        item=card_excerpt(db,snapshot["direction_id"],sid,snapshot["card"],relevant,actions.get(sid))
+        items.append(apply_editorial(item,edits.get(sid,{})))
     review = report.get("review") or {}
     pick = review.get("proposal") or {}
     proposed = next((a for a in actions.values() if (a.get("action_id") or a.get("id"))==pick.get("action_id")),None)
@@ -149,7 +170,7 @@ def project_report(db, kind, selected_date):
                for d in report.get("evolution",[])]
     return {
         "date":report.get("date"), "kind":kind,"state":"published",
-        "summary":review.get("summary") or (items[0]["judgment"] if items else None),
+        "summary":review.get("summary") or editorial.get("summary") or (items[0]["judgment"] if items else None),
         "items":items,"watch":[{"direction_id":w.get("dir_id"),"snapshot_id":w.get("id"),"question":w.get("question")}
                               for w in report.get("watch",[]) if w.get("dir_id")],
         "readings":reading_links,
@@ -186,6 +207,7 @@ def direction_reading(did: str, snapshot: str | None = None):
         if selected:
             body=json.loads(selected["body"])
             current=card_excerpt(db,did,selected["id"],body)
+            apply_editorial(current,editorial_for_snapshot(db,selected["id"]))
             current.update(selected_at=selected["generated_at"],verdict=selected["verdict"],
                 open_issue=selected["reason"] if selected["verdict"]!="supported" else None,
                 history=body.get("history") or [],nearest=body.get("nearest"),

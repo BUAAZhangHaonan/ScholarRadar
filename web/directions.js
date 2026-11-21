@@ -41,7 +41,7 @@ async function detail(id,sid){
   const opening=supported?prose(cur.judgment)+prose(cur.change):
     prose(cur?.open_issue?note(cur.open_issue):"这个问题正在跟踪中，尚待形成有材料支撑的判断。");
   const entry=supported?prose(hypothesis.hypothesis||d.question)+
-    '<dl class="kv">'+terms([["可复用",fit.asset],["开展条件",fit.needed],["预计投入",fit.budget]])+'</dl>'+
+    '<dl class="kv">'+terms([[cur.edited_personal_connection?"可复用":"提案中的资产条件",cur.personal_fit||fit.asset],["开展条件",fit.needed],["预计投入",fit.budget]])+'</dl>'+
     (cur.next_step?'<div class="story-next">'+prose(cur.next_step)+'</div>':"")+
     (cur.action_id?'<div class="story-actions">'+acceptControl(cur.action_id,cur.action_state)+'</div>':""):
     prose(d.question===d.title?d.method:d.question)+prose(d.setting);
