@@ -331,6 +331,61 @@ class Records(unittest.TestCase):
             self.assertEqual(val["new_evidence_ids"], [])
             self.assertEqual(val["previous_snapshot"], first["snapshots"][0])
 
+    def test_no_change_explanation_stays_with_the_previous_judgment(self):
+        seen = "2026-01-03T01:00:00+00:00"
+        with database(write=True) as db:
+            record = self.record(
+                db,
+                "Study",
+                "unchanged",
+                "v1",
+                "one finding",
+                "finding",
+                seen,
+                self.second,
+                targets=[self.did],
+            )
+            db.execute(
+                "INSERT INTO snapshots VALUES(?,?,?,?,?,?,?,?,?,?)",
+                (
+                    "prior",
+                    self.did,
+                    self.first,
+                    seen,
+                    seen,
+                    self.run["profile_id"],
+                    "scope",
+                    "1",
+                    json.dumps({"judgment": "还需要一个配对对照"}),
+                    "earlier",
+                ),
+            )
+            db.execute(
+                "INSERT INTO assessment_reviews VALUES(?,?,?,?,?,?)",
+                ("prior", seen, "supported", "已有论证", "[]", "independent"),
+            )
+            db.execute(
+                "INSERT INTO direction_changes VALUES(?,?,?,?,?,?,NULL)",
+                ("followup", "reading", record[0], record[2], self.did, seen),
+            )
+        reply = {
+            "cards": [],
+            "no_change_reason": "这次补读澄清了测量范围，仍缺配对对照。",
+        }
+        with patch.object(
+            assessment, "ask", new=AsyncMock(return_value=reply)
+        ) as model:
+            self.assertEqual(asyncio.run(assessment.assess(self.run))["snapshots"], [])
+            asyncio.run(assessment.assess(self.run))
+            self.assertEqual(model.await_count, 1)
+        with database() as db:
+            note = db.execute("SELECT * FROM reassessment_notes").fetchone()
+            self.assertEqual(
+                (note["snapshot_id"], note["reasoning"]),
+                ("prior", reply["no_change_reason"]),
+            )
+            self.assertEqual(json.loads(note["input_changes"]), ["followup"])
+
     def test_paper_record_rejects_claim_links_from_another_revision(self):
         with database(write=True) as db:
             a = self.record(
