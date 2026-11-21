@@ -1,4 +1,5 @@
 import hashlib
+import fcntl
 import sqlite3
 from contextlib import contextmanager
 
@@ -31,6 +32,14 @@ def database(path=None, *, write=False):
 
 
 def migrate(path=None):
+    target=path or DB
+    target.parent.mkdir(parents=True,exist_ok=True)
+    with (target.parent/("."+target.name+".migration.lock")).open("a+b") as guard:
+        fcntl.flock(guard,fcntl.LOCK_EX)
+        _apply_migrations(target)
+
+
+def _apply_migrations(path):
     with database(path) as db:
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("CREATE TABLE IF NOT EXISTS migrations(version TEXT PRIMARY KEY)")
