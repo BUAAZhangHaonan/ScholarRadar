@@ -14,6 +14,7 @@ def main():
     sub = parser.add_subparsers(dest="cmd", required=True)
     for name in ("init", "serve", "inventory", "login-link", "status"):
         sub.add_parser(name)
+    sub.add_parser("github-sync", help="将已保存的报告和 ARC 结果加入 GitHub 补传队列")
     worker = sub.add_parser("worker")
     worker.add_argument("--once", action="store_true")
     run = sub.add_parser("run")
@@ -64,6 +65,11 @@ def main():
         from .access import issue_link
 
         print(issue_link())
+    elif a.cmd == "github-sync":
+        from .github_results import backfill
+
+        with database(write=True) as db:
+            print(json.dumps(backfill(db), ensure_ascii=False))
     elif a.cmd == "backup":
         from .archive import backup
         import re
@@ -83,3 +89,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -282,7 +282,7 @@ async def publish(run):
     with database() as db:
         issues = rows(
             db,
-            "SELECT stage,outcome FROM jobs WHERE run_id=? AND status='failed' ORDER BY stage,id",
+            "SELECT stage,outcome FROM jobs WHERE run_id=? AND status='failed' AND stage!='github_sync' ORDER BY stage,id",
             (rid,),
         )
     with database() as db:
@@ -387,6 +387,9 @@ async def publish(run):
             "INSERT OR IGNORE INTO report_versions VALUES(?,?,?,?)",
             (report["snapshot_id"], report_id, report["generated_at"], dump(report)),
         )
+        from .github_results import enqueue_result
+
+        enqueue_result(db, rid, "report", report["snapshot_id"])
     out = ROOT / "exports" / str(day) / kind
     atomic_text(out / "report.md", markdown(report))
     atomic_text(
@@ -397,3 +400,4 @@ async def publish(run):
         "directions": len(report["directions"]),
         "evidence": len(report["evidence"]),
     }
+

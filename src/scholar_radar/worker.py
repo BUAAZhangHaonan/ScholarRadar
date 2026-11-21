@@ -21,6 +21,7 @@ from .resources import verify_resources
 from .settings import VAR, now
 from .changes import current_run
 from .prestudy_worker import execute as execute_arc
+from .github_results import sync as sync_github_results
 
 STAGES = {
     "arc_stage": execute_arc,
@@ -35,6 +36,7 @@ STAGES = {
     "revise": revise,
     "resources": verify_resources,
     "publish": publish,
+    "github_sync": sync_github_results,
     "archive": archive_run,
 }
 
@@ -61,7 +63,7 @@ async def execute(run, job, owner):
         handler = STAGES[job["stage"]]
         detail = await (
             handler(run, json.loads(job["payload"]))
-            if job["stage"] in {"read", "arc_stage"}
+            if job["stage"] in {"read", "arc_stage", "github_sync"}
             else handler(run)
         )
         ok = True
@@ -107,3 +109,4 @@ async def worker(once=False):
                 return
             else:
                 await asyncio.sleep(3)
+

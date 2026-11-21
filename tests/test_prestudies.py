@@ -95,6 +95,31 @@ class SelectedIdea(DatabaseCase):
                 1,
             )
 
+    def test_completed_draft_without_understanding_is_queued_for_github(self):
+        action = self.submit()
+        with database() as db:
+            handoff = db.execute("SELECT * FROM arc_handoffs WHERE id=?", (action["id"],)).fetchone()
+            origin = json.loads(handoff["bundle_json"])["origin"]
+        result = {
+            "handoff_id": action["id"], "stage": "develop", "focus": self.selection.focus,
+            "idea_id": "saved-idea", "run_id": "saved-run", "origin": origin,
+            "execution_status": "completed", "presentation_status": "draft",
+            "draft_text": "只有已完成的研究原稿，没有 current_understanding",
+        }
+        with patch("scholar_radar.github_results.configuration", return_value={
+            "enabled": True, "repository": "example/research-results", "branch": "main",
+        }):
+            save_result(action["id"], result)
+            with database(write=True) as db:
+                from scholar_radar.github_results import backfill, saved_result
+
+                self.assertEqual(backfill(db)["arc_results"], 1)
+                jobs = list(db.execute("SELECT payload FROM jobs WHERE stage='github_sync'"))
+                self.assertEqual(len(jobs), 1)
+                payload = json.loads(jobs[0][0])
+                self.assertEqual(payload["result_id"], action["id"])
+            self.assertIn("只有已完成的研究原稿", saved_result(payload)[1])
+
     def test_recover_same_native_stage_and_keep_draft_and_external_sources(self):
         action = self.submit()
         hid = action["id"]
@@ -184,3 +209,4 @@ class SelectedIdea(DatabaseCase):
                     }
                 )
             )
+

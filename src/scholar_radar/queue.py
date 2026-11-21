@@ -19,6 +19,7 @@ ORDER = (
     "review",
     "revise",
     "publish",
+    "github_sync",
     "archive",
 )
 
@@ -50,7 +51,7 @@ def enqueue(db, kind, day):
     )
     stages = ORDER if kind == "daily" else ("publish", "archive")
     for stage in stages:
-        if stage not in {"read", "arc_stage", "complete_batch"}:
+        if stage not in {"read", "arc_stage", "complete_batch", "github_sync"}:
             job(db, rid, stage)
     return rid
 
@@ -91,9 +92,14 @@ def schedule(db, instant, limit=7):
                 resume(db, row["id"], automatic=True)
         if created >= limit:
             break
+    # ARC results and backfilled reports can belong to older, non-daily runs.
+    for row in db.execute(
+        "SELECT DISTINCT run_id FROM jobs WHERE stage='github_sync' AND status='failed' AND attempts<3"
+    ).fetchall():
+        resume(db, row["run_id"], automatic=True, stages={"github_sync"})
 
 
-def resume(db, rid, automatic=False):
+def resume(db, rid, automatic=False, stages=None):
     run = db.execute("SELECT id FROM runs WHERE id=?", (rid,)).fetchone()
     if not run:
         raise ValueError("运行不存在")
@@ -101,6 +107,8 @@ def resume(db, rid, automatic=False):
     for j in db.execute(
         "SELECT * FROM jobs WHERE run_id=? AND status='failed'", (rid,)
     ).fetchall():
+        if stages is not None and j["stage"] not in stages:
+            continue
         reason = (j["outcome"] or "").lower()
         transient = any(
             word in reason
@@ -112,6 +120,7 @@ def resume(db, rid, automatic=False):
                 "503",
                 "504",
                 "archiveunavailable",
+                "githubsyncunavailable",
                 "上游结果尚未确认",
             )
         )
@@ -130,7 +139,7 @@ def resume(db, rid, automatic=False):
         changed.append(j["stage"])
     if changed:
         db.execute("UPDATE runs SET status='queued',ended_at=NULL WHERE id=?", (rid,))
-        if any(s != "archive" for s in changed):
+        if any(s not in {"archive", "github_sync"} for s in changed):
             db.execute(
                 "UPDATE jobs SET status='queued' WHERE run_id=? AND stage IN ('assess','publish','archive')",
                 (rid,),
@@ -185,3 +194,4 @@ def finish(db, rid, jid, ok, detail):
             "UPDATE runs SET status=?,ended_at=? WHERE id=?",
             ("partial" if failed or partial else "done", now(), rid),
         )
+

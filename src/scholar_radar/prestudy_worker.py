@@ -79,6 +79,10 @@ def save_result(hid, data):
             "UPDATE arc_handoffs SET idea_id=?,arc_run_id=?,status=?,result_json=?,updated_at=?,error=NULL WHERE id=?",
             (data["idea_id"], data["run_id"], status, dump(data), now(), hid),
         )
+        if status == "completed":
+            from .github_results import enqueue_result
+
+            enqueue_result(db, h["radar_run_id"], "arc", hid)
         if status == "completed" and data.get("current_understanding"):
             from .changes import invalidate
 
@@ -134,3 +138,4 @@ async def execute(run, payload):
 
 class StageStopped(RuntimeError):
     pass
+
