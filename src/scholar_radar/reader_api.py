@@ -403,6 +403,7 @@ def direction_reading(did: str, snapshot: str | None = None):
                 open_issue=selected["reason"]
                 if selected["verdict"] != "supported"
                 else None,
+                question=body.get("question"),
                 history=body.get("history") or [],
                 nearest=body.get("nearest"),
                 feasibility=body.get("feasibility"),

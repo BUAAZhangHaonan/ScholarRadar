@@ -348,11 +348,27 @@ export async function attachPrestudy(root, direction, snapshot) {
             '"></textarea></label>' +
             '<div class="buttons"><button type="submit">开始预研</button><button type="button" class="quiet" data-cancel>取消</button></div></form>';
           const form = $("form", entry);
-          form.elements.focus.value =
-            stage === "run"
-              ? existing.find((t) => t.next_question)?.next_question ||
-                direction.question
-              : direction.question;
+          const snapshotQuestion =
+            direction.current?.question ||
+            direction.question ||
+            direction.title;
+          let suggested = "";
+          function updateSuggestion() {
+            const inherited = seen.get(form.elements.idea?.value);
+            const next =
+              stage === "run" && typeof inherited?.next_question === "string"
+                ? inherited.next_question
+                : snapshotQuestion;
+            if (
+              !form.elements.focus.value ||
+              form.elements.focus.value === suggested
+            )
+              form.elements.focus.value = next;
+            suggested = next;
+          }
+          updateSuggestion();
+          if (form.elements.idea)
+            form.elements.idea.onchange = updateSuggestion;
           form.elements.focus.focus();
           $("[data-cancel]", form).onclick = () => {
             entry.replaceChildren();
