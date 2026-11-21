@@ -52,6 +52,10 @@ function mainStory(item) {
     '</div><div class="story-actions"><a class="button" href="' +
     target +
     '">查看研究切口</a>' +
+    (item.prestudy?.task_id
+      ? '<a href="' + pathFor("tasks", item.prestudy.task_id) + '">' +
+        (item.prestudy.stage === "run" ? "阅读前提检查" : "阅读研究方案") + '</a>'
+      : "") +
     followControl(item.direction_id, item.followed, item.snapshot_id) +
     "</div>" +
     (item.materials?.length

@@ -226,6 +226,7 @@ def project_report(db, kind, selected_date):
             relevant,
             actions.get(sid),
         )
+        item["prestudy"] = (report.get("prestudy_followups") or {}).get(sid)
         items.append(apply_editorial(item, edits.get(sid, {})))
     if edits:
         priority = {sid: i for i, sid in enumerate(edits)}
@@ -325,13 +326,6 @@ def project_report(db, kind, selected_date):
         }
         for d in report.get("evolution", [])
     ]
-    order = {
-        entry["snapshot_id"]: i
-        for i, entry in enumerate((report.get("editorial") or {}).get("items", []))
-        if entry.get("snapshot_id")
-    }
-    if kind == "daily" and order:
-        items.sort(key=lambda item: order.get(item["snapshot_id"], len(order)))
     return {
         "date": report.get("date"),
         "kind": kind,

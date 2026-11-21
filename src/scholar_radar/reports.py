@@ -297,8 +297,29 @@ async def publish(run):
               ORDER BY s2.generated_at DESC,s2.rowid DESC LIMIT 1) ORDER BY d.id LIMIT 3""",
             (low, cutoff, cutoff),
         )
+        followups = {}
+        for card in cards if kind == "daily" else []:
+            stage = db.execute(
+                """
+                SELECT id,stage,focus,result_json FROM arc_handoffs WHERE snapshot_id=? AND status='completed'
+                AND substr(datetime(updated_at,'+8 hours'),1,10)<=? ORDER BY updated_at DESC,rowid DESC LIMIT 1
+            """,
+                (card["id"], str(day)),
+            ).fetchone()
+            if stage:
+                result = json.loads(stage["result_json"])
+                followups[card["id"]] = {
+                    "task_id": stage["id"],
+                    "stage": stage["stage"],
+                    "focus": stage["focus"],
+                    "next_question": result.get("next_question"),
+                    "decision": result.get("research_decision"),
+                    "evidence_limited": result.get("evidence_limited"),
+                }
     report = {**obj, "kind": kind, "date": str(day), "issues": issues, "watch": pending}
-    report.update(evolution=series, research_updates=updates)
+    report.update(
+        evolution=series, research_updates=updates, prestudy_followups=followups
+    )
     report["snapshot_id"] = key(
         "research-edition-v2-reading-2",
         obj["snapshot_id"],
@@ -308,6 +329,7 @@ async def publish(run):
         series,
         updates,
         feedback,
+        *([followups] if kind == "daily" else []),
     )
     with database() as db:
         saved = db.execute(
@@ -321,7 +343,7 @@ async def publish(run):
         from .reading_copy import editorial
 
         report["editorial"] = await editorial(
-            run, prof, cards, obj["evidence"], updates
+            run, prof, cards, obj["evidence"], followups
         )
     if not saved and kind != "daily" and (cards or series):
         review = await ask(
