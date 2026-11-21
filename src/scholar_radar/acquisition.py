@@ -106,6 +106,19 @@ async def collect(run):
             )
     except Exception as exc:
         issues.append(("ScholarTrace", str(exc)[:220]))
+    with database() as db: profile=get_profile(db,run["profile_id"])
+    if day.weekday()==profile["weekly_day"]:
+        from .discovery import discover_frontier
+        try:
+            frontier=await discover_frontier(day,rid)
+            if frontier is not None:
+                materials=frontier.get("papers") or []
+                gathered.extend({**p,"discovery_layer":"frontier"} for p in materials)
+                with database(write=True) as db:
+                    coverage(db,rid,"ScholarTrace 前沿观察","discovery",run["scope"],"前沿与个人主线的相邻问题",
+                             day-timedelta(days=6),day,len(materials),len(materials),frontier.get("status","unknown"),
+                             reason="独立低频主题检索")
+        except Exception as exc: issues.append(("ScholarTrace 前沿观察",str(exc)[:200]))
     def register(db,p):
         try: ident=external_key(p)
         except (TypeError,AttributeError): return None
@@ -271,55 +284,6 @@ async def reading(run, payload):
 
 
 async def complete_cold_batch(run):
-    """Fill available first-batch slots when a configured core theme lacks an anchored reading."""
-    if not json.loads(run["detail"])["cold"]:
-        return {"additional": 0}
-    rid = run["id"]
     with database() as db:
-        existing = list(
-            db.execute(
-                "SELECT work_key,paper,status FROM readings WHERE run_id=?", (rid,)
-            )
-        )
-        profile = get_profile(db, run["profile_id"])
-    slots = min(4, 20 - len(existing))
-    if slots < 1:
-        return {"additional": 0}
-
-    def core(p):
-        title = p["title"].lower()
-        return ("hallucinat" in title or "conflict" in title) and any(
-            w in title
-            for w in ("visual", "vision", "multimodal", "multi-modal", "image")
-        )
-
-    if (
-        sum(core(json.loads(r["paper"])) for r in existing if r["status"] == "done")
-        >= 2
-    ):
-        return {"additional": 0}
-    known = {r["work_key"] for r in existing}
-    candidates = [
-        p
-        for p in json.loads((folder(rid) / "candidates.json").read_text())
-        if core(p) and p.get("arxiv_id") and external_key(p) not in known
-    ]
-    chosen = await shortlist(candidates, profile, slots, rid)
-    with database(write=True) as db:
-        for p in chosen:
-            wk = external_key(p)
-            db.execute(
-                "INSERT OR IGNORE INTO readings VALUES(?,?,?,'queued','{}')",
-                (rid, wk, dump(p)),
-            )
-            job(db, rid, "read", {"key": wk})
-        selected = [
-            json.loads(r[0])["work_id"]
-            for r in db.execute(
-                "SELECT paper FROM readings WHERE run_id=? ORDER BY rowid", (rid,)
-            )
-        ]
-        db.execute(
-            "UPDATE evaluations SET selected=? WHERE run_id=?", (dump(selected), rid)
-        )
-    return {"additional": len(chosen), "reason": "补足缺少固定原文的核心研究问题"}
+        count=db.execute("SELECT count(*) FROM readings WHERE run_id=?",(run["id"],)).fetchone()[0]
+    return {"selected":count,"additional":0}

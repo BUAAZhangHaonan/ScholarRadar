@@ -104,3 +104,14 @@ if __name__ == "__main__":
     elif sys.argv[1:] == ["official"]:
         result = asyncio.run(official_page(sources()["official_job"], day))
         print("web-research:", sorted(result), len(result.get("text", "")), flush=True)
+
+
+async def discover_frontier(day,run_id):
+    """One separate discovery budget per ISO week and source version."""
+    cfg=sources(); themes=cfg.get("frontier") or []
+    if not themes:return None
+    monday=day-timedelta(days=day.weekday())
+    args={"theme_document":f"{monday} 开始的一周：围绕 {'、'.join(themes)}，寻找有独立公开论文或评估资源的具体子问题。"
+          +"说明与 "+"、".join(cfg["topics"])+" 中某项问题能怎样连接；大规模训练工作可仅供了解。",
+          "final_limit":3,"agent_candidate_limit":18,"include_rationale":True}
+    return await invoke("trace","query",args,identity=["frontier-v1",cfg["query_version"],str(monday)],id_field="request_id",run_id=run_id)
