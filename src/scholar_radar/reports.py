@@ -157,7 +157,7 @@ def markdown(report):
 
 async def publish(run):
     rid = run["id"]
-    kind = run["kind"]
+    kind = "daily" if run["kind"]=="research_update" else run["kind"]
     day = date.fromisoformat(run["as_of"])
     from .shadow import refresh
 
@@ -173,7 +173,7 @@ async def publish(run):
         if kind == "daily":
             selected = rows(
                 db,
-                "SELECT s.* FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id AND a.verdict='supported' WHERE s.run_id=? ORDER BY s.generated_at,s.rowid",
+                "SELECT s.* FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id AND a.verdict='supported' WHERE s.run_id=? ORDER BY s.generated_at DESC,s.rowid DESC",
                 (rid,),
             )
         else:
@@ -186,6 +186,16 @@ async def publish(run):
                                 ORDER BY s.generated_at DESC""",
                 (str(start), str(end)),
             )
+        from .period_history import evolution
+        from .record_store import research_updates
+        from .recommendations import signals
+        series=evolution(db,start,end,prof["timezone"]) if kind!="daily" else []
+        updates=research_updates(db,rid,limit=8) if kind=="daily" else []
+        active={v[0] for v in db.execute("SELECT DISTINCT s.dir_id FROM actions a JOIN snapshots s ON s.id=a.snapshot_id WHERE a.status IN ('active','accepted')")}
+        followed={f[0] for f in db.execute("""SELECT f.entity_id FROM feedback f WHERE f.dimension='follow' AND f.value='followed' AND f.rowid=(
+              SELECT max(v.rowid) FROM feedback v WHERE v.entity_type='direction' AND v.entity_id=f.entity_id AND v.dimension='follow')""")}
+        turning={v["direction_id"] for v in series if len({n["verdict"] for n in v["nodes"]})>1}
+        selected.sort(key=lambda v:(v["dir_id"] in active,v["dir_id"] in followed,v["dir_id"] in turning),reverse=True)
         cards = []
         seen = set()
         for s in selected:
@@ -223,10 +233,16 @@ async def publish(run):
             )
             obj["coverage"]["window_start"] = str(start)
             obj["coverage"]["window_end"] = str(end)
-        feedback = rows(
-            db,
-            "SELECT dimension,value,count(*) count FROM feedback GROUP BY dimension,value",
-        )
+        feedback=signals(db,limit=30) if kind!="daily" else []
+        if kind!="daily":
+            from datetime import datetime,time,UTC
+            from zoneinfo import ZoneInfo
+            begin=datetime.combine(start,time.min,ZoneInfo(prof["timezone"])).astimezone(UTC).isoformat()
+            stop=datetime.combine(end+timedelta(days=1),time.min,ZoneInfo(prof["timezone"])).astimezone(UTC).isoformat()
+            feedback=[f for f in feedback if begin<=f["created_at"]<stop]
+            # Each selected question retains its opening position, all subsequent evidence and the user's outcomes.
+            for v in series:
+                if any(n.get("actions") or n.get("feedback") for n in v["nodes"]): v["has_user_outcome"]=True
     with database() as db:
         issues = rows(
             db,
@@ -246,7 +262,8 @@ async def publish(run):
             (low, cutoff, cutoff),
         )
     report = {**obj, "kind": kind, "date": str(day), "issues": issues, "watch": pending}
-    report["snapshot_id"] = key(obj["snapshot_id"], issues, obj["coverage"], pending)
+    report.update(evolution=series,research_updates=updates)
+    report["snapshot_id"] = key("research-edition-v2",obj["snapshot_id"], issues, obj["coverage"], pending,series,updates,feedback)
     with database() as db:
         saved = db.execute(
             "SELECT body FROM report_versions WHERE id=?", (report["snapshot_id"],)
@@ -255,18 +272,22 @@ async def publish(run):
         report = json.loads(saved[0])
         for action in report.get("proposed_actions", []):
             action["action_id"] = action["id"]
-    if not saved and kind != "daily" and cards:
+    if not saved and kind=="daily" and cards:
+        from .reading_copy import editorial
+        report["editorial"]=await editorial(run,prof,cards,obj["evidence"],updates)
+    if not saved and kind != "daily" and (cards or series):
         review = await ask(
             kind + "_review",
             prof["strong_model"],
             "只使用给定方向快照和反馈，写中文复盘。返回 {summary,readings:[证据ID],proposal:{action_id,why},unresolved}。"
-            "总结研究线索怎样演变、尚待验证的预测和判断条件。读物最多五份，最多一个可选验证。"
+            "按期初判断、支持与反例、范围如何收窄、下一步来写，区分需补证和已复核的认识。读物最多五份，最多一个可选验证。"
             "没有实际反馈时保留待评价，不能预测录用、收益或岗位结果。",
             {
                 "cards": cards,
                 "actions": obj["proposed_actions"],
                 "feedback": feedback,
                 "period": kind,
+                "evolution":series,
             },
             rid,
             max_tokens=2200,
