@@ -1,172 +1,27 @@
-import {
-  $,
-  api,
-  esc,
-  heading,
-  list,
-  empty,
-  modal,
-  send,
-  msg,
-} from "./common.js";
-const labels = {
-  trace: "ScholarTrace",
-  analysis: "ScholarAnalysis",
-  web: "webresearch-mcp",
-  queued: "排队中",
-  running: "运行中",
-  done: "完成",
-  partial: "部分完成",
-  failed: "失败",
-  daily: "日报",
-  weekly: "周报",
-  monthly: "月报",
-  pending: "待归档",
-  archived: "已归档",
-};
-const t = (v) => labels[v] || v;
-export async function render() {
-  const [p, s, runs] = await Promise.all([
-    api("/api/profile"),
-    api("/api/status"),
-    api("/api/runs"),
-  ]);
-  $("#app").innerHTML =
-    heading("设置与运行", "查看来源覆盖、调用费用与任务状态。") +
-    '<div class="layout"><div class="stack"><section class="panel"><h2>任务队列</h2><div class="controls"><label>手工任务<select id="mode"><option value="daily">日报</option><option value="weekly">周报</option><option value="monthly">月报</option></select></label><button id="launch">加入队列</button><button class="quiet" id="refresh">刷新状态</button></div>' +
-    (runs.length
-      ? list(
-          runs.map(
-            (r) =>
-              '<button class="link" data-run="' +
-              esc(r.id) +
-              '">' +
-              esc(r.as_of + "　" + t(r.kind)) +
-              "</button>　" +
-              esc(t(r.status)) +
-              "<br><small>" +
-              esc(
-                r.jobs
-                  .map((j) => j.stage + " " + j.count + " " + t(j.status))
-                  .join(" · "),
-              ) +
-              "</small>",
-          ),
-        )
-      : empty("尚无任务。")) +
-    '</section><section class="panel"><h2>个人画像与日程</h2><form class="form" id="profile-form"><div class="two"><label>时区<input name="timezone" value="' +
-    esc(p.timezone) +
-    '" required></label><label>每天启动<input name="daily_time" type="time" value="' +
-    esc(p.daily_time) +
-    '" required></label></div><div class="two"><label>日报重点条数<input name="daily_limit" type="number" min="0" max="5" value="' +
-    p.daily_limit +
-    '"></label><label>同时进行的验证<input name="active_limit" type="number" min="1" max="10" value="' +
-    p.active_limit +
-    '"></label></div><label>研究问题（每行一项）<textarea name="goals">' +
-    esc(p.goals.join("\n")) +
-    '</textarea></label><details><summary>模型、研究资产与完整配置</summary><label>画像 JSON<textarea id="full-profile" rows="15">' +
-    esc(JSON.stringify(p, null, 2)) +
-    '</textarea></label><button id="save-full" type="button" class="quiet">保存完整画像</button></details><button>保存画像与日程</button></form></section></div>' +
-    '<aside class="stack"><section class="panel"><h3>MCP 来源</h3>' +
-    list(
-      Object.entries(s.services).map(
-        ([k, v]) =>
-          "<strong>" +
-          esc(t(k)) +
-          "</strong><br><small>" +
-          esc(v.status === "ok" ? "已连接" : v.status) +
-          " · " +
-          esc(v.tools.join("、")) +
-          "</small>",
-      ),
-    ) +
-    '</section><section class="panel"><h3>累计用量</h3><p class="meta">已知下界 ¥' +
-    esc(s.cost.known_lower) +
-    "<br>已知上界 " +
-    esc(s.cost.known_upper == null ? "待核算" : "¥" + s.cost.known_upper) +
-    "<br>待核算 " +
-    s.cost.unknown +
-    ' 项</p></section><section class="panel"><h3>NAS 归档</h3>' +
-    (s.archive.length
-      ? list(s.archive.map((x) => esc(t(x.status)) + "　" + x.count))
-      : empty("暂无归档记录。")) +
-    "</section></aside></div>";
-  const { controls } = await import("./research-settings.js");
-  await controls(document.querySelector("#app .stack"));
-  $("#refresh").onclick = render;
-  $("#launch").onclick = async () => {
-    const r = await send("/api/runs", { kind: $("#mode").value });
-    msg(
-      r.reused
-        ? "已复用已有任务 · " + t(r.status)
-        : "任务已入队 " + r.run_id.slice(0, 8),
-    );
-    render();
+import {$,api,esc,heading,msg,send} from "./common.js";
+
+function lines(value){return String(value??"").split("\n").map(x=>x.trim()).filter(Boolean)}
+export async function render(){
+  const p=await api("/api/profile"); document.title="个人设置 · ScholarRadar";
+  $("#app").innerHTML=heading("个人设置")+'<form id="preferences" class="form profile-form">'+
+    '<section class="panel"><h2>当前研究</h2><div class="form"><label>研究目标（每行一项）<textarea name="goals">'+esc(p.goals.join("\n"))+'</textarea></label>'+
+    '<label>正在推进的项目（每行一项）<textarea name="projects">'+esc((p.current_actions||[]).join("\n"))+'</textarea></label>'+
+    '<label>个人研究资产<textarea name="assets" rows="5">'+esc(p.assets.map(a=>a.name||"").join("\n"))+'</textarea></label>'+
+    '</div></section><section class="panel"><h2>节奏与投入</h2><div class="two">'+
+    '<label>时区<input name="timezone" required value="'+esc(p.timezone)+'"></label><label>日报时间<input name="daily_time" type="time" required value="'+esc(p.daily_time)+'"></label>'+
+    '<label>日报重点条数<input name="daily_limit" type="number" required min="0" max="5" value="'+p.daily_limit+'"></label>'+
+    '<label>同时进行的验证<input name="active_limit" type="number" required min="1" max="10" value="'+p.active_limit+'"></label>'+
+    '</div></section><div class="buttons"><button>保存个人设置</button><a href="/maintenance">运行维护</a></div></form>'+
+    '<details class="rule-section" id="profile-all"><summary>完整画像与模型设置</summary><form class="form" id="edit-json"><label>完整画像 JSON<textarea name="content" rows="15">'+
+    esc(JSON.stringify(p,null,2))+'</textarea></label><button>保存完整画像</button></form></details>';
+  $("#preferences").onsubmit=async e=>{
+    e.preventDefault();const f=new FormData(e.target),bank=new Map(p.assets.map(a=>[a.name,a]));
+    const newProfile={...p,goals:lines(f.get("goals")),current_actions:lines(f.get("projects")),
+      assets:lines(f.get("assets")).map(name=>bank.get(name)||{name,source:"用户填写"}),
+      timezone:f.get("timezone"),daily_time:f.get("daily_time"),daily_limit:Number(f.get("daily_limit")),active_limit:Number(f.get("active_limit"))};
+    try{await send("/api/profile",newProfile,"PUT");msg("个人设置已保存");await render()}catch(ex){msg(ex.message)}
   };
-  $("#profile-form").onsubmit = async (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const value = {
-      ...p,
-      goals: String(f.get("goals")).split("\n").filter(Boolean),
-      timezone: f.get("timezone"),
-      daily_time: f.get("daily_time"),
-      active_limit: Number(f.get("active_limit")),
-      daily_limit: Number(f.get("daily_limit")),
-    };
-    try {
-      await send("/api/profile", value, "PUT");
-      msg("已保存画像版本");
-      render();
-    } catch (ex) {
-      msg(ex.message);
-    }
-  };
-  $("#save-full").onclick = async () => {
-    try {
-      await send("/api/profile", JSON.parse($("#full-profile").value), "PUT");
-      msg("已保存画像版本");
-      render();
-    } catch (ex) {
-      msg(ex.message);
-    }
-  };
-  document.querySelectorAll("[data-run]").forEach(
-    (b) =>
-      (b.onclick = async () => {
-        const r = await api("/api/runs/" + b.dataset.run);
-        modal(
-          r.as_of + " · " + t(r.kind),
-          "<h3>来源覆盖</h3>" +
-            list(
-              r.coverage.map((x) =>
-                esc(x.source + " · " + t(x.status) + "　" + (x.reason || "")),
-              ),
-            ) +
-            "<h3>任务与异常</h3>" +
-            list(
-              r.jobs.map(
-                (j) =>
-                  esc(j.stage + " · " + t(j.status)) +
-                  (j.status === "failed"
-                    ? "<br><small>" + esc(j.outcome) + "</small>"
-                    : ""),
-              ),
-            ) +
-            "<h3>调用</h3>" +
-            list(
-              r.calls.map((v) =>
-                esc(
-                  v.service +
-                    "/" +
-                    v.tool +
-                    " · " +
-                    t(v.status) +
-                    (v.cached ? " · 已复用" : ""),
-                ),
-              ),
-            ),
-        );
-      }),
-  );
+  $("#edit-json").onsubmit=async e=>{e.preventDefault();try{
+    const data=JSON.parse(new FormData(e.target).get("content"));await send("/api/profile",data,"PUT");msg("完整画像已保存");await render()
+  }catch(ex){msg(ex.message)}};
 }
