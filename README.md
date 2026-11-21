@@ -65,26 +65,21 @@ systemctl --user restart scholar-radar-api.service scholar-radar-worker.service
 ### 启用自动提交
 
 1. 创建一个**私有**结果仓库，例如 `BUAAZhangHaonan/ScholarRadar-Results`，勾选初始化 README。代码仓库当前公开，默认不允许将个人研究结果写入公开仓库。确实希望公开时，需明确添加 `"allow_public": true`。
-2. 为结果仓库准备 GitHub fine-grained token，仅授予该仓库 `Contents: Read and write`。令牌保存在 g203，不写入 GitHub，也不放入报告。
-3. 将以下字段**合并**到 `var/private/deployment.json`；保留原有 MCP、模型与 NAS 配置：
+2. worker 可以复用 g203 上有目标私有仓库 Contents 读写权限的 GitHub token。新签发 fine-grained token 时，仓库范围只需选择这个结果仓库。凭据保存在 g203 的私有环境文件中。
+3. 将以下字段**合并**到 `var/private/deployment.json`；保留原有 MCP、模型与 NAS 配置。分支填写目标仓库实际使用的名称，下面以 `master` 为例：
 
 ```json
 "github_results": {
   "enabled": true,
   "repository": "BUAAZhangHaonan/ScholarRadar-Results",
-  "branch": "main",
+  "branch": "master",
   "token_env": "SCHOLARRADAR_GITHUB_TOKEN"
 }
 ```
 
 如需经代理访问 GitHub，可在 `github_results` 中设置 `proxy` 为本机 HTTP 代理地址。该配置只用于结果仓库的请求。
 
-4. 在本机 `var/private/github-results.env` 中写入 `SCHOLARRADAR_GITHUB_TOKEN=实际令牌`，设置文件权限为 `600`。用 `systemctl --user edit scholar-radar-worker.service` 添加以下内容，使后台 worker 能读取令牌：
-
-```ini
-[Service]
-EnvironmentFile=%h/zhanghaonan/ScholarRadar/var/private/github-results.env
-```
+4. 在 g203 的 `var/private/github-results.env` 设置 `SCHOLARRADAR_GITHUB_TOKEN`，并将文件权限设为 `600`。项目自带的 worker 单元会在启动时读取这个文件。更换凭据后重启 worker 即可生效。
 
 5. 重启 worker，并把已有结果加入补传队列：
 
