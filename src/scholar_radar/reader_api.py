@@ -95,7 +95,6 @@ def card_excerpt(db, direction_id, snapshot_id, card, evidence=None, action=None
 
 def apply_editorial(item, entry):
     for source, target in (
-        ("title", "title"),
         ("change", "change"),
         ("personal_connection", "personal_fit"),
         ("next_step", "next_step"),
@@ -112,7 +111,7 @@ def editorial_for_snapshot(db, snapshot_id):
     row = db.execute(
         """SELECT entry.value FROM snapshots s JOIN reports r ON r.run_id=s.run_id AND r.kind='daily'
            JOIN json_each(r.body,'$.editorial.items') entry ON json_extract(entry.value,'$.snapshot_id')=s.id
-           WHERE s.id=? ORDER BY r.generated_at DESC LIMIT 1""",
+           WHERE s.id=? ORDER BY r.generated_at DESC,CAST(entry.key AS INTEGER) LIMIT 1""",
         (snapshot_id,),
     ).fetchone()
     return json.loads(row[0]) if row else {}
@@ -209,9 +208,10 @@ def project_report(db, kind, selected_date):
     evidence = {e["id"]: e for e in report.get("evidence", []) if e.get("id")}
     actions = {a.get("snapshot_id"): a for a in report.get("proposed_actions", [])}
     editorial = (report.get("editorial") or {}) if kind == "daily" else {}
-    edits = {
-        e["snapshot_id"]: e for e in editorial.get("items", []) if e.get("snapshot_id")
-    }
+    edits = {}
+    for entry in editorial.get("items", []):
+        if entry.get("snapshot_id"):
+            edits.setdefault(entry["snapshot_id"], entry)
     items = []
     for snapshot in report.get("directions", []):
         sid = snapshot["id"]

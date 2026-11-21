@@ -42,20 +42,20 @@ async def editorial(run, profile, cards, evidence, updates):
         run["id"],
         max_tokens=2000,
     )
-    ids = {s["id"] for s in cards}
-    items = [
-        x
-        for x in result.get("items", [])
-        if isinstance(x, dict)
-        and x.get("snapshot_id") in ids
-        and all(
-            isinstance(x.get(k), str) and x[k].strip()
-            for k in ("title", "change", "personal_connection", "next_step")
-        )
-    ]
+    titles = {s["id"]: s["card"]["title"] for s in cards}
+    items = {}
+    for entry in result.get("items", []):
+        if not isinstance(entry, dict):
+            continue
+        sid = entry.get("snapshot_id")
+        if sid in titles and sid not in items and all(
+            isinstance(entry.get(k), str) and entry[k].strip()
+            for k in ("change", "personal_connection", "next_step")
+        ):
+            items[sid] = {**entry, "title": titles[sid]}
     return {
         "summary": result.get("summary")
         if isinstance(result.get("summary"), str)
         else None,
-        "items": items,
+        "items": list(items.values()),
     }
