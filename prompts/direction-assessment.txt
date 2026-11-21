@@ -18,3 +18,5 @@
 reading_record_ids 记录本次真正用到的论文分析（W1R1 等）。资源实际开放的判断另给 resource_evidence_ids（W1A1 等），并说明已查到哪次发布、哪个文件。仅访问到页面时仍可写作者声明及待核验的要件。不要把运行解析服务的设备、按需申请的计算资源写成已经预留的训练预算。
 
 明确比较旧版时，history 的该项填写 version_role="historical_comparison"、对应 revision_id 与旧版引文 ID。当前判断的 work_ids/evidence_ids 及待验证预测继续使用当前修订。新引文的措辞在旧解析文本中未出现，只是定位变化的线索，须比较任务、设置与结果才能判断新增实验。
+
+给能逐项比对的研究结果添加 evidence_relations 数组，每项为 {assertion,conditions,relation,work_id,evidence_ids}。assertion 是具体可被支持或反驳的陈述，conditions 指任务、对照和指标条件，relation 取 supports、contradicts、qualifies。方向相同不构成支持，两项研究实验条件不同也不能据此断言相互反驳；没有明确关系时保留空数组。

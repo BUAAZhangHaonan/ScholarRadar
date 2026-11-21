@@ -56,6 +56,9 @@ def packet(db, run, direction=None, events=(), extra_works=()):
                 "judgment": json.loads(r["body"])["judgment"],
                 "as_of": r["as_of"],
                 "role": "当时已发表的判断",
+                "evidence_relations": json.loads(r["body"]).get(
+                    "evidence_relations", []
+                ),
             }
     return papers, jobs, previous
 
@@ -90,6 +93,20 @@ def validate_card(card, papers, jobs):
         a["evidence_id"] for wid in works for a in papers[wid].get("artifacts", [])
     }:
         raise ValueError("资源状态缺少实际文件或发布条目的核验依据")
+    for rel in card.get("evidence_relations") or []:
+        if (
+            not isinstance(rel, dict)
+            or rel.get("work_id") not in works
+            or rel.get("relation") not in {"supports", "contradicts", "qualifies"}
+            or not all(
+                isinstance(rel.get(k), str) and rel[k].strip()
+                for k in ("assertion", "conditions")
+            )
+            or not isinstance(rel.get("evidence_ids"), list)
+            or not rel["evidence_ids"]
+            or not set(rel["evidence_ids"]) <= papers[rel["work_id"]]["quotes"].keys()
+        ):
+            raise ValueError("研究结果与具体主张之间的关系缺少可对照的条件或原文")
     if not ids or not set(ids) <= allowed:
         raise ValueError("方向引用了输入之外的论文证据")
     timeline = []
@@ -162,6 +179,8 @@ def validate_card(card, papers, jobs):
     cited = set(ids) | set(h["evidence_ids"])
     for row in timeline:
         cited.update(row["evidence_ids"])
+    for rel in card.get("evidence_relations") or []:
+        cited.update(rel["evidence_ids"])
     return sorted(cited), works
 
 
@@ -243,6 +262,21 @@ def persist_card(db, run, profile, card, ids, works, papers, sig):
                     "INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",
                     (sid, old_note["record_id"]),
                 )
+    for rel in card.get("evidence_relations") or []:
+        db.executemany(
+            "INSERT OR IGNORE INTO direction_evidence_relations VALUES(?,?,?,?,?,?)",
+            (
+                (
+                    sid,
+                    rel["work_id"],
+                    eid,
+                    rel["assertion"],
+                    rel["conditions"],
+                    rel["relation"],
+                )
+                for eid in rel["evidence_ids"]
+            ),
+        )
     for eid in refs:
         db.execute(
             "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)",

@@ -124,6 +124,21 @@ async def revise(run):
                 "INSERT OR IGNORE INTO snapshot_reading_records SELECT ?,record_id FROM snapshot_reading_records WHERE snapshot_id=?",
                 (sid, s["id"]),
             )
+            for rel in c.get("evidence_relations") or []:
+                db.executemany(
+                    "INSERT OR IGNORE INTO direction_evidence_relations VALUES(?,?,?,?,?,?)",
+                    (
+                        (
+                            sid,
+                            rel["work_id"],
+                            eid,
+                            rel["assertion"],
+                            rel["conditions"],
+                            rel["relation"],
+                        )
+                        for eid in rel["evidence_ids"]
+                    ),
+                )
             for eid in refs:
                 db.execute(
                     "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)", (sid, eid)

@@ -512,3 +512,59 @@ class Records(unittest.TestCase):
             [x["heading"] for x in section_catalog("# X\n```sh\n# pretend\n```\n")],
             ["X"],
         )
+
+    def test_conflicting_works_keep_separate_relations_to_the_same_statement(self):
+        with database(write=True) as db:
+            self.record(
+                db,
+                "Retinal control A",
+                "p1",
+                "v1",
+                "Observed an effect.",
+                "effect",
+                "2026-01-02T02:00:00+00:00",
+                self.first,
+                targets=[self.did],
+            )
+            self.record(
+                db,
+                "Retinal control B",
+                "p2",
+                "v1",
+                "No matched effect.",
+                "No matched effect",
+                "2026-01-03T02:00:00+00:00",
+                self.second,
+                targets=[self.did],
+            )
+
+        def contrast(*args, **kwargs):
+            response = answer(*args, **kwargs)
+            card = response["cards"][0]
+            paper_list = args[3]["papers"]
+            card["evidence_relations"] = [
+                {
+                    "assertion": "同一对照下观察到改善",
+                    "conditions": "相同的协议与指标",
+                    "relation": (
+                        "supports" if p["title"].endswith("A") else "contradicts"
+                    ),
+                    "work_id": p["work_id"],
+                    "evidence_ids": [next(iter(p["quotes"]))],
+                }
+                for p in paper_list
+            ]
+            return response
+
+        with patch.object(assessment, "ask", new=AsyncMock(side_effect=contrast)):
+            sid = asyncio.run(assessment.assess(self.run, [self.did]))["snapshots"][0]
+        with database() as db:
+            self.assertEqual(
+                dict(
+                    db.execute(
+                        "select relation,count(distinct work_id) from direction_evidence_relations where snapshot_id=? group by relation",
+                        (sid,),
+                    )
+                ),
+                {"supports": 1, "contradicts": 1},
+            )
