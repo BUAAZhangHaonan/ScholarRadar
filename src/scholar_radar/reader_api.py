@@ -325,8 +325,13 @@ def project_report(db, kind, selected_date):
         }
         for d in report.get("evolution", [])
     ]
-    order={entry["snapshot_id"]:i for i,entry in enumerate((report.get("editorial") or {}).get("items",[])) if entry.get("snapshot_id")}
-    if kind=="daily" and order:items.sort(key=lambda item:order.get(item["snapshot_id"],len(order)))
+    order = {
+        entry["snapshot_id"]: i
+        for i, entry in enumerate((report.get("editorial") or {}).get("items", []))
+        if entry.get("snapshot_id")
+    }
+    if kind == "daily" and order:
+        items.sort(key=lambda item: order.get(item["snapshot_id"], len(order)))
     return {
         "date": report.get("date"),
         "kind": kind,
@@ -480,25 +485,35 @@ def paper_reading(wid: str):
             (wid,),
         )
         for resource in links:
-            resource["files"] = rows(db, """
+            resource["files"] = rows(
+                db,
+                """
                 WITH versions AS (
                     SELECT kind,path,url,last_verified_at,row_number() OVER (
                         PARTITION BY kind,path ORDER BY last_verified_at DESC,rowid DESC
                     ) latest FROM verified_artifacts WHERE resource_id=?
                 )
                 SELECT kind,path,url,last_verified_at FROM versions WHERE latest=1
-                ORDER BY last_verified_at DESC,kind,path""", (resource["id"],))
+                ORDER BY last_verified_at DESC,kind,path""",
+                (resource["id"],),
+            )
         related = rows(
             db,
             """SELECT DISTINCT d.id,d.title,d.question FROM directions d JOIN memberships m
                        ON d.id=m.direction_id WHERE m.work_id=? AND d.status!='merged' ORDER BY d.title""",
             (wid,),
         )
-        document_urls = {r["id"]: r["url"] for r in db.execute(
-            "SELECT v.id,d.url FROM revisions v JOIN documents d ON d.id=v.document_id WHERE d.work_id=?", (wid,)
-        )}
+        document_urls = {
+            r["id"]: r["url"]
+            for r in db.execute(
+                "SELECT v.id,d.url FROM revisions v JOIN documents d ON d.id=v.document_id WHERE d.work_id=?",
+                (wid,),
+            )
+        }
         for record in readable:
-            record["url"] = versioned_url(document_urls.get(record["revision_id"]), record["version"])
+            record["url"] = versioned_url(
+                document_urls.get(record["revision_id"]), record["version"]
+            )
         return {
             "id": wid,
             "title": work["title"],

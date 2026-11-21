@@ -161,7 +161,7 @@ def markdown(report):
 
 async def publish(run):
     rid = run["id"]
-    kind = "daily" if run["kind"]=="research_update" else run["kind"]
+    kind = "daily" if run["kind"] == "research_update" else run["kind"]
     day = date.fromisoformat(run["as_of"])
     from .shadow import refresh
 
@@ -193,13 +193,33 @@ async def publish(run):
         from .period_history import evolution
         from .record_store import research_updates
         from .recommendations import signals
-        series=evolution(db,start,end,prof["timezone"]) if kind!="daily" else []
-        updates=research_updates(db,rid,limit=8) if kind=="daily" else []
-        active={v[0] for v in db.execute("SELECT DISTINCT s.dir_id FROM actions a JOIN snapshots s ON s.id=a.snapshot_id WHERE a.status IN ('active','accepted')")}
-        followed={f[0] for f in db.execute("""SELECT f.entity_id FROM feedback f WHERE f.dimension='follow' AND f.value='followed' AND f.rowid=(
-              SELECT max(v.rowid) FROM feedback v WHERE v.entity_type='direction' AND v.entity_id=f.entity_id AND v.dimension='follow')""")}
-        turning={v["direction_id"] for v in series if len({n["verdict"] for n in v["nodes"]})>1}
-        selected.sort(key=lambda v:(v["dir_id"] in active,v["dir_id"] in followed,v["dir_id"] in turning),reverse=True)
+
+        series = evolution(db, start, end, prof["timezone"]) if kind != "daily" else []
+        updates = research_updates(db, rid, limit=8) if kind == "daily" else []
+        active = {
+            v[0]
+            for v in db.execute(
+                "SELECT DISTINCT s.dir_id FROM actions a JOIN snapshots s ON s.id=a.snapshot_id WHERE a.status IN ('active','accepted')"
+            )
+        }
+        followed = {
+            f[0]
+            for f in db.execute("""SELECT f.entity_id FROM feedback f WHERE f.dimension='follow' AND f.value='followed' AND f.rowid=(
+              SELECT max(v.rowid) FROM feedback v WHERE v.entity_type='direction' AND v.entity_id=f.entity_id AND v.dimension='follow')""")
+        }
+        turning = {
+            v["direction_id"]
+            for v in series
+            if len({n["verdict"] for n in v["nodes"]}) > 1
+        }
+        selected.sort(
+            key=lambda v: (
+                v["dir_id"] in active,
+                v["dir_id"] in followed,
+                v["dir_id"] in turning,
+            ),
+            reverse=True,
+        )
         cards = []
         seen = set()
         for s in selected:
@@ -237,16 +257,28 @@ async def publish(run):
             )
             obj["coverage"]["window_start"] = str(start)
             obj["coverage"]["window_end"] = str(end)
-        feedback=signals(db,limit=30) if kind!="daily" else []
-        if kind!="daily":
-            from datetime import datetime,time,UTC
+        feedback = signals(db, limit=30) if kind != "daily" else []
+        if kind != "daily":
+            from datetime import datetime, time, UTC
             from zoneinfo import ZoneInfo
-            begin=datetime.combine(start,time.min,ZoneInfo(prof["timezone"])).astimezone(UTC).isoformat()
-            stop=datetime.combine(end+timedelta(days=1),time.min,ZoneInfo(prof["timezone"])).astimezone(UTC).isoformat()
-            feedback=[f for f in feedback if begin<=f["created_at"]<stop]
+
+            begin = (
+                datetime.combine(start, time.min, ZoneInfo(prof["timezone"]))
+                .astimezone(UTC)
+                .isoformat()
+            )
+            stop = (
+                datetime.combine(
+                    end + timedelta(days=1), time.min, ZoneInfo(prof["timezone"])
+                )
+                .astimezone(UTC)
+                .isoformat()
+            )
+            feedback = [f for f in feedback if begin <= f["created_at"] < stop]
             # Each selected question retains its opening position, all subsequent evidence and the user's outcomes.
             for v in series:
-                if any(n.get("actions") or n.get("feedback") for n in v["nodes"]): v["has_user_outcome"]=True
+                if any(n.get("actions") or n.get("feedback") for n in v["nodes"]):
+                    v["has_user_outcome"] = True
     with database() as db:
         issues = rows(
             db,
@@ -266,8 +298,17 @@ async def publish(run):
             (low, cutoff, cutoff),
         )
     report = {**obj, "kind": kind, "date": str(day), "issues": issues, "watch": pending}
-    report.update(evolution=series,research_updates=updates)
-    report["snapshot_id"] = key("research-edition-v2-reading-2",obj["snapshot_id"], issues, obj["coverage"], pending,series,updates,feedback)
+    report.update(evolution=series, research_updates=updates)
+    report["snapshot_id"] = key(
+        "research-edition-v2-reading-2",
+        obj["snapshot_id"],
+        issues,
+        obj["coverage"],
+        pending,
+        series,
+        updates,
+        feedback,
+    )
     with database() as db:
         saved = db.execute(
             "SELECT body FROM report_versions WHERE id=?", (report["snapshot_id"],)
@@ -276,9 +317,12 @@ async def publish(run):
         report = json.loads(saved[0])
         for action in report.get("proposed_actions", []):
             action["action_id"] = action["id"]
-    if not saved and kind=="daily" and cards:
+    if not saved and kind == "daily" and cards:
         from .reading_copy import editorial
-        report["editorial"]=await editorial(run,prof,cards,obj["evidence"],updates)
+
+        report["editorial"] = await editorial(
+            run, prof, cards, obj["evidence"], updates
+        )
     if not saved and kind != "daily" and (cards or series):
         review = await ask(
             kind + "_review",
@@ -291,7 +335,7 @@ async def publish(run):
                 "actions": obj["proposed_actions"],
                 "feedback": feedback,
                 "period": kind,
-                "evolution":series,
+                "evolution": series,
             },
             rid,
             max_tokens=2200,
