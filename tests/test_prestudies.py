@@ -68,8 +68,8 @@ class SelectedIdea(DatabaseCase):
             calls.append(operation)
             if operation == "result":
                 return native
-            return {**native,"execution_status":"completed","research_decision":"pause","current_understanding":"当前证据只支持较窄条件",
-                    "evidence_limited":True,"presentation_status":"polish_failure","polish_failure":"未取得成文结果",
+            return {**native,"execution_status":"completed","research_decision":"lead","current_understanding":"当前证据只支持较窄条件",
+                    "evidence_limited":True,"presentation_status":"draft","polish_failure":"未取得成文结果",
                     "draft_text":"保留的研究原稿","source_directory":[{"id":"new-paper","url":"https://example.org/paper"}],
                     "source_mapping":{"new-paper":"native-source"},"cited_source_ids":["new-paper"]}
         with patch("scholar_radar.prestudy_worker.command",native_result):
@@ -79,8 +79,8 @@ class SelectedIdea(DatabaseCase):
         with database() as db:
             obj = present(db.execute(QUERY+" WHERE h.id=?",(hid,)).fetchone())
             self.assertTrue(obj["evidence_limited"])
-            self.assertEqual((obj["research_decision"],obj["draft_text"],obj["sources"][0]["id"]),("pause","保留的研究原稿","new-paper"))
-            self.assertEqual(obj["presentation_status"], "polish_failure")
+            self.assertEqual((obj["research_decision"],obj["draft_text"],obj["sources"][0]["id"]),("lead","保留的研究原稿","new-paper"))
+            self.assertEqual((obj["presentation_status"], obj["polish_failure"]), ("draft", "未取得成文结果"))
             self.assertEqual(db.execute("SELECT count(*) FROM direction_changes WHERE kind='arc_result'").fetchone()[0],1)
         next_task = self.submit(self.selection.model_copy(update={"idea_id":"actual-idea","stage":"run","request_id":"stage-two"}))
         self.assertNotEqual(next_task["id"],hid)

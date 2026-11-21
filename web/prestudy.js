@@ -15,7 +15,7 @@ const activeStates = new Set([
   "in_progress",
 ]);
 export const isActive = (task) =>
-  activeStates.has(task.status) || activeStates.has(task.execution_status);
+  activeStates.has(task.status || task.execution_status);
 const decisionNames = {
   discuss: "值得进一步讨论",
   lead: "保留研究线索",
@@ -125,6 +125,9 @@ function sourceList(task) {
   const used = [...groups.values()].filter((e) => e.cited),
     other = [...groups.values()].filter((e) => !e.cited);
   return (
+    (task.unresolved_cited_source_ids?.length
+      ? '<p class="sub">' + esc(task.unresolved_cited_source_ids.length) + ' 条引用尚待对应到原始来源。</p>'
+      : "") +
     (used.length
       ? '<section class="source-fold"><h3>正文引用</h3>' +
         listing(used) +

@@ -65,7 +65,7 @@ def present(row):
     obj={k:row[k] for k in ("id","direction_id","snapshot_id","profile_id","stage","focus","idea_id","arc_run_id","status","created_at","updated_at")}
     result=json.loads(row["result_json"] or "{}")
     obj.update({k:result.get(k) for k in ("execution_status","research_decision","evidence_limited","current_understanding",
-                "next_question","presentation_status","presentation","draft","draft_text","cited_source_ids","previous_stage","source_mapping","stop_reason","polish_failure")})
+                "next_question","presentation_status","presentation","draft","draft_text","cited_source_ids","previous_stage","source_mapping","source_notes","source_trace_status","unresolved_cited_source_ids","stop_reason","polish_failure")})
     obj.update(direction_title=row["direction_title"],sources=result.get("source_directory",[]),error=row["error"])
     return obj
 
