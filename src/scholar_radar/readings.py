@@ -61,6 +61,8 @@ async def analyze_revision(wid,rid,focus,run_id,*,research_question=None,paper=N
     if heading: question+=f"\n本次核对实际章节《{heading}》。"
     if research_question: question+="\n本次待澄清的问题："+research_question
     for record in existing:
+        if required_heading and not (record["coverage"]["start"]<=offset and record["coverage"]["end"]>=offset+size):
+            continue
         if record["focus"]==focus and (record["question"]==question or
               (not research_question and not record["sections"] and record["question"].startswith(("论文用什么方法","请核对当前原文章节")))):
             if run_id:
@@ -163,7 +165,7 @@ async def read_paper(paper, run_id=None):
     url = (
         ("https://arxiv.org/abs/" + base)
         if base
-        else (first.get("source", {}).get("original_url") or "https://doi.org/" + query)
+        else (first.get("source", {}).get("original_url") or paper.get("pdf_url") or "https://doi.org/" + query)
     )
     with database(write=True) as db:
         wid = work(db, paper["title"], ids, paper)

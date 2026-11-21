@@ -71,11 +71,12 @@ def paper_material(db,wid,cutoff,priority_record_ids=()):
            JOIN reading_record_directions rd ON rd.record_id=r.id WHERE r.work_id=? AND r.revision_id=?""",(wid,rev))}
     paper={"work_id":wid,"title":work["title"],"version":active[0]["version"],"revision_id":rev,
            "date":meta.get("published_date"),"year":meta.get("year"),"first_seen":work["first_seen"],
-           "direction_ids":sorted(classified),"reading_records":active,"quotes":{}}
+           "direction_ids":sorted(classified),"reading_records":active,"quotes":{},"quote_roles":{}}
     for r in active:
-        for ev in db.execute("""SELECT e.id,e.quote FROM claim_evidence ce JOIN evidence e ON e.id=ce.evidence_id
+        for ev in db.execute("""SELECT e.id,e.quote,e.stance FROM claim_evidence ce JOIN evidence e ON e.id=ce.evidence_id
                        WHERE ce.claim_id=? AND e.revision_id=? ORDER BY e.start,e.end""",(r["id"],rev)):
             paper["quotes"][ev["id"]]=ev["quote"]
+            paper["quote_roles"][ev["id"]]=ev["stance"]
     older=[r for r in records if r["id"] in priority_record_ids and r["revision_id"]!=rev]
     if older:
         paper["historical_comparison"]=[{"version":r["version"],"revision_id":r["revision_id"],"question":r["question"],

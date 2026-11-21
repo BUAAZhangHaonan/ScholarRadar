@@ -17,9 +17,9 @@ def packet(db,run,direction=None,events=(),extra_works=()):
     jobs = rows(
         db,
         """SELECT e.id,e.quote,p.title,p.url,p.organization_id,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
-        JOIN evidence e ON e.revision_id=o.revision_id WHERE o.status='advertised'
-        AND o.verified_at=(SELECT max(o2.verified_at) FROM posting_observations o2 WHERE o2.posting_id=p.id)
-        ORDER BY e.start LIMIT 14""",
+        JOIN evidence e ON e.revision_id=o.revision_id WHERE o.status='advertised' AND o.verified_at<=?
+        AND o.verified_at=(SELECT max(o2.verified_at) FROM posting_observations o2 WHERE o2.posting_id=p.id AND o2.verified_at<=?)
+        ORDER BY e.start LIMIT 14""", (cutoff_for(run),cutoff_for(run)),
     )
     prefs = get_profile(db, run["profile_id"])
     excluded = {
