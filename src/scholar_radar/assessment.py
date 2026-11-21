@@ -3,6 +3,8 @@ import re
 
 from .db import database, key, rows
 from .evidence import claim
+from . import changes
+from .research_materials import select_papers, signature, cutoff_for, terms
 from .factors import activity, put_values
 from .models import ask
 from .source_labels import label_inputs
@@ -10,52 +12,8 @@ from .profile import get_profile
 from .settings import ROOT, dump, now
 
 
-def packet(db, run):
-    rid = run["id"]
-    recent = rows(
-        db,
-        """SELECT w.id wid,w.title,w.metadata,w.first_seen,e.id eid,e.quote,c.statement FROM readings l
-        JOIN works w ON w.id=json_extract(l.outcome,'$.work_id')
-        JOIN documents d ON d.work_id=w.id JOIN revisions v ON v.document_id=d.id
-        JOIN evidence e ON e.revision_id=v.id JOIN claim_evidence ce ON ce.evidence_id=e.id
-        JOIN claims c ON c.id=ce.claim_id AND c.kind='system_inference'
-        WHERE l.run_id=? AND l.status='done' ORDER BY w.id,e.start""",
-        (rid,),
-    )
-    history = rows(
-        db,
-        """SELECT w.id wid,w.title,w.metadata,w.first_seen,e.id eid,e.quote,NULL statement FROM
-        snapshots s JOIN assessment_reviews ar ON ar.snapshot_id=s.id AND ar.verdict='supported' JOIN snapshot_evidence se ON se.snapshot_id=s.id JOIN evidence e ON e.id=se.evidence_id
-        JOIN revisions v ON v.id=e.revision_id JOIN documents d ON d.id=v.document_id JOIN works w ON w.id=d.work_id
-        WHERE s.as_of<=? ORDER BY s.generated_at DESC LIMIT 90""",
-        (run["as_of"] + "T23:59:59",),
-    )
-    papers = {}
-    for r in recent + history:
-        meta = json.loads(r["metadata"])
-        p = papers.setdefault(
-            r["wid"],
-            {
-                "work_id": r["wid"],
-                "title": r["title"],
-                "date": meta.get("published_date") or None,
-                "year": meta.get("year"),
-                "first_seen": r["first_seen"],
-                "analysis": (r["statement"] or "")[:780],
-                "quotes": {},
-            },
-        )
-        if len(p["quotes"]) < 4:
-            p["quotes"][r["eid"]] = r["quote"][:1400]
-    for wid, p in papers.items():
-        p["resources"] = rows(
-            db,
-            """SELECT DISTINCT res.url,o.status,o.observed_at,e.quote FROM work_resources m
-            JOIN resources res ON res.id=m.resource_id JOIN resource_observations o ON o.resource_id=res.id
-            LEFT JOIN evidence e ON e.id=o.evidence_id WHERE m.work_id=? AND o.status='accessible'
-            ORDER BY o.observed_at DESC LIMIT 3""",
-            (wid,),
-        )
+def packet(db,run,direction=None,events=(),extra_works=()):
+    papers=select_papers(db,run,direction,events,extra_works)
     jobs = rows(
         db,
         """SELECT e.id,e.quote,p.title,p.url,p.organization_id,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
@@ -89,37 +47,26 @@ def packet(db, run):
     jobs = eligible
     previous = {}
     for r in db.execute(
-        "SELECT s.dir_id,s.id,s.body FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE a.verdict='supported' ORDER BY s.generated_at DESC"
+        "SELECT s.dir_id,s.id,s.body,s.as_of FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE a.verdict='supported' ORDER BY s.generated_at DESC"
     ):
-        if r["dir_id"] not in previous:
+        if r["as_of"]<=cutoff_for(run) and r["dir_id"] not in previous:
             previous[r["dir_id"]] = {
                 "snapshot_id": r["id"],
                 "judgment": json.loads(r["body"])["judgment"],
+                "as_of":r["as_of"],"role":"当时已发表的判断",
             }
     return papers, jobs, previous
 
 
 def validate_card(card, papers, jobs):
-    neighbor = card.get("nearest")
-    if isinstance(neighbor, dict):
-        if neighbor.get("work_id") not in papers:
-            raise ValueError("最近邻作品不在输入集合")
-        card["nearest"] = "　".join(
-            str(neighbor[k])
-            for k in ("title", "similarity", "difference")
-            if neighbor.get(k)
-        )
-    for field in (
-        "title",
-        "judgment",
-        "change",
-        "nearest",
-        "question",
-        "method",
-        "setting",
-    ):
-        if not isinstance(card.get(field), str) or not card[field].strip():
-            raise ValueError("方向卡缺少 " + field)
+    neighbor=card.get("nearest")
+    if isinstance(neighbor,dict):
+        if neighbor.get("work_id") not in papers or not all(isinstance(neighbor.get(k),str) and neighbor[k].strip() for k in ("title","similarity","difference")):
+            raise ValueError("最近邻需包含可核对的作品、共同点和具体差别")
+    elif not isinstance(neighbor,str) or not neighbor.strip():
+        raise ValueError("缺少最近邻材料")
+    for field in ("title","judgment","change","question","method","setting"):
+        if not isinstance(card.get(field),str) or not card[field].strip(): raise ValueError("方向卡缺少 "+field)
     works = list(dict.fromkeys(card.get("work_ids", [])))
     ids = list(dict.fromkeys(card.get("evidence_ids", [])))
     if not works or not set(works) <= papers.keys():
@@ -174,7 +121,7 @@ def validate_card(card, papers, jobs):
         raise ValueError("行动类型无效")
     if not isinstance(card.get("feasibility"), dict):
         raise ValueError("缺少个人条件")
-    narrative = " ".join([card["judgment"], card["change"], card["nearest"]])
+    narrative = " ".join([card["judgment"], card["change"], dump(card["nearest"])])
     for metric in re.findall(r"\d+(?:\.\d+)?\s*[%％]", narrative):
         number = re.search(r"\d+(?:\.\d+)?", metric)[0]
         if not any(number in q for w in works for q in papers[w]["quotes"].values()):
@@ -185,169 +132,198 @@ def validate_card(card, papers, jobs):
     return sorted(cited), works
 
 
-async def assess(run):
-    with database() as db:
-        papers, jobs, previous = packet(db, run)
-        dirs = rows(
-            db,
-            "SELECT id,title,question,method,setting,layer FROM directions WHERE status!='merged'",
+def persist_card(db,run,profile,card,ids,works,papers,sig):
+    did = card.get("direction_id")
+    if did == "new":
+        did = key(
+            "candidate", card["question"], card["method"], card["setting"]
         )
-        profile = get_profile(db, run["profile_id"])
-        past = {
+        db.execute(
+            "INSERT OR IGNORE INTO directions VALUES(?,?,?,'candidate',?,?,?,'1',?)",
+            (
+                did,
+                card["title"],
+                card.get("layer", "adjacent"),
+                card["question"],
+                card["method"],
+                card["setting"],
+                now(),
+            ),
+        )
+    if not db.execute(
+        "SELECT id FROM directions WHERE id=?", (did,)
+    ).fetchone():
+        raise ValueError("未知方向")
+    for wid in works:
+        db.execute(
+            "INSERT OR IGNORE INTO memberships VALUES(?,?,? ,?,?)",
+            (did, wid, "1", dump(ids), now()),
+        )
+    jobids = (card.get("job_match") or {}).get("evidence_ids", [])
+    refs = sorted(set(ids) | set(jobids))
+    old = db.execute(
+        "SELECT id FROM snapshots WHERE dir_id=? ORDER BY generated_at DESC LIMIT 1",
+        (did,),
+    ).fetchone()
+    older = (
+        {
             r[0]
             for r in db.execute(
-                "SELECT evidence_id FROM assessed_inputs WHERE profile_id=? AND rule_version='evidence-v2'",
-                (profile["id"],),
+                "SELECT evidence_id FROM snapshot_evidence WHERE snapshot_id=?",
+                (old[0],),
             )
         }
-    all_ids = {eid for p in papers.values() for eid in p["quotes"]} | {
-        j["id"] for j in jobs
-    }
-    if not papers or (past and not all_ids - past):
-        return {"snapshots": [], "reason": "没有新的有效证据"}
-    instruction = (ROOT / "prompts/direction-assessment.txt").read_text()
-    paper_input, job_input, restore_ids = label_inputs(papers, jobs)
-    data = await ask(
-        "synthesis",
-        profile["strong_model"],
-        instruction,
-        {
-            "papers": paper_input,
-            "jobs": job_input,
-            "directions": dirs,
-            "previous": previous,
-            "as_of": run["as_of"],
-            "assets": profile["assets"],
-            "compute": profile["compute"],
-            "goals": profile["goals"],
-            "weeks": profile["validation_weeks"],
-        },
-        run["id"],
-        max_tokens=8500,
+        if old
+        else set()
     )
-    saved = []
-    rejected = []
-    for raw_card in data.get("cards", [])[: profile["daily_limit"]]:
-        card = restore_ids(raw_card)
-        try:
-            ids, works = validate_card(card, papers, jobs)
-            with database(write=True) as db:
-                did = card.get("direction_id")
-                if did == "new":
-                    did = key(
-                        "candidate", card["question"], card["method"], card["setting"]
-                    )
-                    db.execute(
-                        "INSERT OR IGNORE INTO directions VALUES(?,?,?,'candidate',?,?,?,'1',?)",
-                        (
-                            did,
-                            card["title"],
-                            card.get("layer", "adjacent"),
-                            card["question"],
-                            card["method"],
-                            card["setting"],
-                            now(),
-                        ),
-                    )
-                if not db.execute(
-                    "SELECT id FROM directions WHERE id=?", (did,)
-                ).fetchone():
-                    raise ValueError("未知方向")
-                for wid in works:
-                    db.execute(
-                        "INSERT OR IGNORE INTO memberships VALUES(?,?,? ,?,?)",
-                        (did, wid, "1", dump(ids), now()),
-                    )
-                jobids = (card.get("job_match") or {}).get("evidence_ids", [])
-                refs = sorted(set(ids) | set(jobids))
-                old = db.execute(
-                    "SELECT id FROM snapshots WHERE dir_id=? ORDER BY generated_at DESC LIMIT 1",
-                    (did,),
-                ).fetchone()
-                older = (
-                    {
-                        r[0]
-                        for r in db.execute(
-                            "SELECT evidence_id FROM snapshot_evidence WHERE snapshot_id=?",
-                            (old[0],),
-                        )
-                    }
-                    if old
-                    else set()
-                )
-                card.update(
-                    previous_snapshot=old[0] if old else None,
-                    new_evidence_ids=sorted(set(refs) - older),
-                )
-                if old and not card["new_evidence_ids"]:
-                    continue
-                when = now()
-                sig = key(refs)
-                sid = key(did, run["as_of"], profile["id"], run["scope"], "1", sig)
-                db.execute(
-                    "INSERT OR IGNORE INTO snapshots VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (
-                        sid,
-                        did,
-                        run["id"],
-                        when,
-                        when,
-                        profile["id"],
-                        run["scope"],
-                        "1",
-                        dump(card),
-                        sig,
-                    ),
-                )
-                for eid in refs:
-                    db.execute(
-                        "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)",
-                        (sid, eid),
-                    )
-                for kind, statement, eids in [
-                    ("system_inference", card["judgment"], ids),
-                    (
-                        "research_hypothesis",
-                        card["forecast"]["hypothesis"],
-                        card["forecast"]["evidence_ids"],
-                    ),
-                ]:
-                    cid = claim(
-                        db,
-                        kind,
-                        statement,
-                        eids,
-                        refs,
-                        {"scope": run["scope"], "nearest": card["nearest"]},
-                    )
-                    db.execute(
-                        "INSERT OR IGNORE INTO snapshot_claims VALUES(?,?)", (sid, cid)
-                    )
-                put_values(
-                    db, sid, card, refs, activity(db, did, run["scope"], run["as_of"])
-                )
-                action = card["action"]
-                db.execute(
-                    "INSERT OR IGNORE INTO actions VALUES(?,?,?,?,?,?,?)",
-                    (
-                        key(sid, action["title"]),
-                        sid,
-                        action["title"],
-                        action["kind"],
-                        "proposed",
-                        dump(action),
-                        when,
-                    ),
-                )
-                saved.append(sid)
-        except (ValueError, KeyError, TypeError) as exc:
-            rejected.append(str(exc))
-    if rejected and not saved:
-        raise ValueError("方向卡校验失败：" + " / ".join(rejected))
-    with database(write=True) as db:
-        for eid in all_ids:
-            db.execute(
-                "INSERT OR IGNORE INTO assessed_inputs VALUES(?,'evidence-v2',?,?)",
-                (profile["id"], eid, run["id"]),
-            )
-    return {"snapshots": saved, "rejected": rejected}
+    card.update(
+        previous_snapshot=old[0] if old else None,
+        new_evidence_ids=sorted(set(refs) - older),
+    )
+    when = now()
+    sid = key(did, run["as_of"], profile["id"], run["scope"], "1", sig)
+    db.execute(
+        "INSERT OR IGNORE INTO snapshots VALUES(?,?,?,?,?,?,?,?,?,?)",
+        (
+            sid,
+            did,
+            run["id"],
+            when,
+            when,
+            profile["id"],
+            run["scope"],
+            "1",
+            dump(card),
+            sig,
+        ),
+    )
+    for wid in works:
+        for record in papers[wid]["reading_records"]:
+            if set(record["evidence_ids"]) & set(ids):
+                db.execute("INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",(sid,record["id"]))
+    for eid in refs:
+        db.execute(
+            "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)",
+            (sid, eid),
+        )
+    for kind, statement, eids in [
+        ("system_inference", card["judgment"], ids),
+        (
+            "research_hypothesis",
+            card["forecast"]["hypothesis"],
+            card["forecast"]["evidence_ids"],
+        ),
+    ]:
+        cid = claim(
+            db,
+            kind,
+            statement,
+            eids,
+            refs,
+            {"scope": run["scope"], "nearest": card["nearest"]},
+        )
+        db.execute(
+            "INSERT OR IGNORE INTO snapshot_claims VALUES(?,?)", (sid, cid)
+        )
+    put_values(
+        db, sid, card, refs, activity(db, did, run["scope"], run["as_of"])
+    )
+    action = card["action"]
+    db.execute(
+        "INSERT OR IGNORE INTO actions VALUES(?,?,?,?,?,?,?)",
+        (
+            key(sid, action["title"]),
+            sid,
+            action["title"],
+            action["kind"],
+            "proposed",
+            dump(action),
+            when,
+        ),
+    )
+    return sid,did
+
+
+def unassigned_targets(db,events,directions,run):
+    targeted={}
+    for e in events:
+        if e["direction_id"]:
+            targeted.setdefault(e["direction_id"],[]).append(e)
+            continue
+        if e["kind"]!="reading": continue
+        wid=e["entity_id"]
+        linked=changes.work_directions(db,wid)
+        if not linked:
+            note=db.execute("""SELECT w.title,r.topic,c.statement FROM reading_records r JOIN works w ON w.id=r.work_id
+                             JOIN claims c ON c.id=r.id WHERE r.work_id=? AND r.recorded_at<=? ORDER BY r.recorded_at DESC LIMIT 1""",(wid,cutoff_for(run))).fetchone()
+            if note:
+                words,han=terms(" ".join(note))
+                matches=[]
+                for d in directions:
+                    dw,dh=terms(" ".join(d[k] for k in ("title","question","method","setting")))
+                    similarities=len(dw&words)+len(dh&han)
+                    if similarities: matches.append((similarities,d["id"]))
+                if matches:
+                    best=max(x[0] for x in matches)
+                    linked={did for score,did in matches if score==best}
+        for did in linked or {None}: targeted.setdefault(did,[]).append(e)
+    return targeted
+
+
+async def assess(run,direction_ids=None):
+    with database() as db:
+        profile=get_profile(db,run["profile_id"])
+        directions=rows(db,"SELECT id,title,question,method,setting,layer,definition_version FROM directions WHERE status!='merged'")
+        events=changes.pending(db,direction_ids)
+        grouped=unassigned_targets(db,events,directions,run)
+        if direction_ids is not None:
+            for did in direction_ids: grouped.setdefault(did,[])
+    if not grouped: return {"snapshots":[],"reason":"没有与研究方向有关的新输入"}
+    catalog={d["id"]:d for d in directions}
+    instruction=(ROOT/"prompts/direction-assessment.txt").read_text()
+    saved=[]; rejected=[];handled=[]
+    for target,trigger in grouped.items():
+        direction=catalog.get(target)
+        with database() as db:
+            papers,jobs,previous=packet(db,run,direction,trigger)
+            versions=changes.input_versions(db,target) if target else []
+            results=changes.research_outcomes(db,target) if target else []
+            sig=signature(direction,profile["id"],run["scope"],papers,jobs,versions,results)
+            done=db.execute("SELECT 1 FROM direction_assessment_inputs WHERE direction_id=? AND profile_id=? AND signature=?",
+                            (target,profile["id"],sig)).fetchone() if target else None
+        if not papers or done or (not target and len(papers)<2):
+            handled.extend(e["id"] for e in trigger); continue
+        paper_input,job_input,restore_ids=label_inputs(papers,jobs)
+        old=(previous.get(target) if target else None)
+        inputs={"papers":paper_input,"jobs":job_input,"direction":direction,"previous":old,
+                "change_types":sorted({e["kind"] for e in trigger}),"recorded_user_outcomes":results,
+                "as_of":run["as_of"],"assets":profile["assets"],"compute":profile["compute"],
+                "goals":profile["goals"],"weeks":profile["validation_weeks"]}
+        data=await ask("synthesis",profile["strong_model"],instruction,inputs,run["id"],max_tokens=6500)
+        candidates=data.get("cards")
+        if not isinstance(candidates,list): raise ValueError("方向评估未返回有效列表")
+        errors=[]
+        with database(write=True) as db:
+            for raw in candidates[:1]:
+                card=restore_ids(raw)
+                db.execute("SAVEPOINT proposed_card")
+                try:
+                    if card.get("direction_id")!=(target or "new"): raise ValueError("方向卡超出本次评估对象")
+                    if not isinstance(card.get("nearest"),dict): raise ValueError("新增方向卡需要结构化的最近邻比较")
+                    ids,works=validate_card(card,papers,jobs)
+                    sid,did=persist_card(db,run,profile,card,ids,works,papers,sig)
+                    db.execute("RELEASE proposed_card")
+                    saved.append(sid)
+                except (ValueError,KeyError,TypeError) as exc:
+                    db.execute("ROLLBACK TO proposed_card")
+                    db.execute("RELEASE proposed_card")
+                    errors.append(str(exc))
+            if not errors and target:
+                db.execute("INSERT OR IGNORE INTO direction_assessment_inputs VALUES(?,?,?,?,?)",
+                     (target,profile["id"],sig,run["id"],now()))
+        if errors: rejected.extend(errors)
+        else: handled.extend(e["id"] for e in trigger)
+    if not rejected:
+        with database(write=True) as db: changes.consume(db,set(handled))
+    if rejected: raise ValueError("方向卡校验失败："+" / ".join(rejected))
+    return {"snapshots":saved,"processed_changes":list(dict.fromkeys(handled))}

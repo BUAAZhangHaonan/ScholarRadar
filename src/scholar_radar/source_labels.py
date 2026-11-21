@@ -5,6 +5,9 @@ def label_inputs(papers, jobs):
     forward = {}
     for i, (wid, p) in enumerate(papers.items(), 1):
         forward[wid] = f"W{i}"
+        for n,record in enumerate(p.get("reading_records",[]),1):
+            forward[record["id"]]=f"W{i}R{n}"
+            forward[record["revision_id"]]=f"W{i}V"
         for j, eid in enumerate(p["quotes"], 1):
             forward[eid] = f"W{i}E{j}"
     for i, j in enumerate(jobs, 1):

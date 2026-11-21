@@ -1,6 +1,16 @@
-用证据包撰写中文研究方向卡。先解释过去的工作建立了什么判断，指出最新材料改变了哪一部分，再提出下一步可以证伪的预测。简短、具体。论文的题名及综述不是独立实验结果。来源事实只能取自给定引文。不同任务或指标不可排列优劣，数值比较必须同时提供数据集、指标和同一实验条件。研究假设显式保留假设身份。
+把已有材料与本次研究变化放在同一条时间线上，回答选中的具体方向。input.direction 有值时，只评估这个真实方向 ID；为空时，材料支持具体的新问题才可建议 direction_id="new"。
 
-输出 JSON 对象，cards 最多 3 张。每张可选择一个现有 direction_id，或用 direction_id="new" 建议一个具体方向。每张包含 title、question、method、setting、layer(core/adjacent/frontier)、judgment（本次判断）、change（相对前一快照或初始证据的变化）、nearest（最近邻、共同点和差别）、limitation、history（按材料顺序的数组，每项含 work_id、event、evidence_ids）、evidence_ids、work_ids、resources（开放或缺失的具体条件）、forecast（对象，含 hypothesis、horizon、confirm、refute、evidence_ids）、feasibility（对象，含 asset、needed、budget、level）、job_match（仅当有直接关联的官方岗位引文时给出对象，含 requirement、asset、gap、evidence_ids，否则 null）、action（对象，含 kind、title、control、metric、stop、effort）。kind 用 read/verify/observe。建议最多一个成本可承受的小验证，资源不足的前沿问题留作观察。引用 ID 逐字从输入选取。history 中的作品和引文须相互对应。没有值得更新的方向可以返回空数组。
+论文的 reading_records 含实际分析问题、版本、范围、完整研究笔记和相应引文。区分当前修订与 historical_comparison 明示的旧版本。历史近邻候选只有真正相关时才引用。分别核对支持证据、反例、适用条件和仍未解释的部分；同方向的作品可能相互矛盾。previous 是当时的判断。资源材料区分可访问、实际开放的文件与真正复现。recorded_user_outcomes 内的用户结果及 ARC 预研笔记分别说明出处。不同任务、设置和指标的数字不可直接排名。
 
-输入用 W1、W2 等表示作品，W1E1 等表示该作品内的具体引文，J1 等表示官方岗位引文。不要输出数据库标识。每个预测须用至少一个实际 W…E… 引文说明提出该假设的依据，forecast.evidence_ids 不能为空。禁止凭空设定提升百分比、达成概率和论文未给出的量化阈值。把可能的证伪结果写成可观测的比较而非承诺。请优先覆盖有独立支撑的核心多模态问题及与其原理相连的工具约束问题。
-最近邻可给字符串，或给 {work_id,title,similarity,difference}。history 每一条只允许引用属于该作品的 WnEm。work_ids 与 evidence_ids 列全所用的论文和证据，岗位 J 引文单独放入 job_match。输出前逐项核对对应关系。
+有可推进的研究切口时，输出 {"cards":[{...}]}，最多一张；材料只能支持一条论文动态时返回 {"cards":[]}，这份研究记录仍然可以单独阅读。没有实质变化同样返回空列表。所有 ID 从输入取值，用 W1、W1E1 等标签填相应字段，不在自然语言里写标签。
+
+卡片字段：
+- direction_id、title、question、method、setting、layer(core/adjacent/frontier)。
+- change 先说明哪个新事实改变了哪一部分判断，judgment 用一两句写目前认识。两段展现不同内容。
+- nearest 必须是 {work_id,title,similarity,difference}，说明已有工作解决了什么以及这个切口还要回答什么。
+- work_ids、evidence_ids，以及 history 数组，每项 {work_id,event,evidence_ids}。每段历史只引用这项工作的当前输入引文。
+- limitation、resources；feasibility 为 {asset,needed,budget,level}，用实际资产与资源说明个人连接。job_match 仅在官方岗位引文确实支持时给 {requirement,asset,gap,evidence_ids}，其余填 null。团队研究与岗位要求分别解释。
+- forecast 为 {hypothesis,horizon,confirm,refute,evidence_ids}，用实际论文引文说明假设起点，给出能区分解释的结果。操作建议中的目标与已发生事实分别表达。
+- action 为 {kind,title,control,metric,stop,effort}，kind=read/verify/observe。只建议一个与现有条件相称的动作，写清产物。不要设定来源中没有的精确提升幅度。
+
+标题与正文使用自然中文，聚焦研究问题、证据带来的变化和下一步。
