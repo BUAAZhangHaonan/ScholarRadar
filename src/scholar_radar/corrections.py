@@ -9,6 +9,79 @@ from .profile import get_profile
 from .settings import dump, now
 
 
+def frozen_sources(db, snapshot):
+    """Reword using only the exact published packet, even after another reading arrives."""
+    card = json.loads(snapshot["body"])
+    historical = {
+        h.get("revision_id")
+        for h in card.get("history", [])
+        if h.get("version_role") == "historical_comparison"
+    }
+    papers = {}
+    jobs = []
+    for q in rows(
+        db,
+        """SELECT e.id,e.quote,e.revision_id,v.version,d.kind,d.work_id,w.first_seen,w.metadata
+           FROM snapshot_evidence se JOIN evidence e ON e.id=se.evidence_id JOIN revisions v ON v.id=e.revision_id
+           JOIN documents d ON d.id=v.document_id LEFT JOIN works w ON w.id=d.work_id WHERE se.snapshot_id=?""",
+        (snapshot["id"],),
+    ):
+        if not q["work_id"]:
+            if q["kind"] == "job":
+                jobs.append(q)
+            continue
+        meta = json.loads(q["metadata"])
+        w = papers.setdefault(
+            q["work_id"],
+            {
+                "quotes": {},
+                "date": meta.get("published_date"),
+                "year": meta.get("year"),
+                "first_seen": q["first_seen"],
+                "reading_records": [],
+                "artifacts": [],
+                "historical_comparison": [],
+            },
+        )
+        if q["revision_id"] in historical:
+            old = next(
+                (
+                    v
+                    for v in w["historical_comparison"]
+                    if v["revision_id"] == q["revision_id"]
+                ),
+                None,
+            )
+            if old is None:
+                old = {
+                    "revision_id": q["revision_id"],
+                    "version": q["version"],
+                    "quotes": {},
+                }
+                w["historical_comparison"].append(old)
+            old["quotes"][q["id"]] = q["quote"]
+        else:
+            if w.get("revision_id") not in (None, q["revision_id"]):
+                raise ValueError("历史卡当前结果缺少唯一的修订依据")
+            w.update(revision_id=q["revision_id"], version=q["version"])
+            w["quotes"][q["id"]] = q["quote"]
+    for wid, w in papers.items():
+        w["reading_records"] = rows(
+            db,
+            """SELECT r.id FROM snapshot_reading_records x JOIN reading_records r ON r.id=x.record_id
+            WHERE x.snapshot_id=? AND r.work_id=? AND r.revision_id=?""",
+            (snapshot["id"], wid, w.get("revision_id")),
+        )
+        w["artifacts"] = rows(
+            db,
+            """SELECT DISTINCT a.evidence_id FROM snapshot_evidence se
+              JOIN verified_artifacts a ON a.evidence_id=se.evidence_id JOIN work_resources wr ON wr.resource_id=a.resource_id
+              WHERE se.snapshot_id=? AND wr.work_id=?""",
+            (snapshot["id"], wid),
+        )
+    return papers, jobs
+
+
 async def revise(run):
     supplementation = await fill_gaps(run)
     with database() as db:
@@ -73,33 +146,12 @@ async def revise(run):
         c["previous_snapshot"] = s["id"]
         c["new_evidence_ids"] = []
         with database() as db:
-            quotes = rows(
-                db,
-                """SELECT e.id,e.quote,d.work_id,w.first_seen,w.metadata FROM snapshot_evidence se JOIN evidence e ON e.id=se.evidence_id
-               JOIN revisions v ON v.id=e.revision_id JOIN documents d ON d.id=v.document_id LEFT JOIN works w ON w.id=d.work_id
-               WHERE se.snapshot_id=?""",
-                (s["id"],),
-            )
-        papers = {}
-        jobs = []
-        for q in quotes:
-            if q["work_id"]:
-                meta = json.loads(q["metadata"])
-                w = papers.setdefault(
-                    q["work_id"],
-                    {
-                        "quotes": {},
-                        "date": meta.get("published_date"),
-                        "year": meta.get("year"),
-                        "first_seen": q["first_seen"],
-                    },
-                )
-                w["quotes"][q["id"]] = q["quote"]
-            else:
-                jobs.append(q)
+            papers, jobs = frozen_sources(db, s)
         eids, _ = validate_card(c, papers, jobs)
         refs = sorted(
-            set(eids) | set((c.get("job_match") or {}).get("evidence_ids", []))
+            set(eids)
+            | set((c.get("job_match") or {}).get("evidence_ids", []))
+            | set(c.get("resource_evidence_ids") or [])
         )
         with database(write=True) as db:
             sig = key("review_revision", s["id"], c)
