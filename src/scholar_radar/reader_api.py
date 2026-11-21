@@ -226,6 +226,9 @@ def project_report(db, kind, selected_date):
             actions.get(sid),
         )
         items.append(apply_editorial(item, edits.get(sid, {})))
+    if edits:
+        priority = {sid: i for i, sid in enumerate(edits)}
+        items.sort(key=lambda x: priority.get(x["snapshot_id"], len(priority)))
     review = report.get("review") or {}
     unanswered = review.get("unresolved") or []
     if isinstance(unanswered, str):

@@ -157,6 +157,18 @@ function periodEvolution(chains) {
                 (n.verdict === "needs_evidence"
                   ? "材料仍不足，保留为观察问题。"
                   : esc(n.change || n.judgment || "")) +
+                (n.open_issue
+                  ? "<details><summary>仍缺的证据</summary>" +
+                    prose(
+                      n.open_issue
+                        .replace(
+                          /[（(]\s*[a-f0-9]{32}(?:[\s,，、/]+[a-f0-9]{32})*\s*[)）]/gi,
+                          "（见原文）",
+                        )
+                        .replace(/\b[a-f0-9]{32}\b/gi, "相应原文"),
+                    ) +
+                    "</details>"
+                  : "") +
                 nodeEvents(n) +
                 (n.snapshot_id && d.direction_id
                   ? '　<a href="' +
