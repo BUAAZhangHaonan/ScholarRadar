@@ -58,6 +58,10 @@ const readingLevels = {
   abstract: "摘要",
   snippet: "摘录",
   excerpt: "原文片段",
+  passage: "原文片段",
+  title: "题名",
+  full_document: "全文",
+  metadata_only: "元数据",
   partial: "部分原文",
   full: "全文",
   full_text: "全文",
@@ -70,31 +74,69 @@ const readingLevels = {
   content: "原文",
 };
 function sourceList(task) {
-  const sources = task.sources || [];
-  if (!sources.length) return "";
+  const cited = new Set(task.cited_source_ids || []);
+  for (const id of task.presentation?.cited_source_ids || []) cited.add(id);
+  for (const candidate of task.presentation?.candidates || [])
+    for (const id of candidate.cited_source_ids || []) cited.add(id);
+  const groups = new Map();
+  for (const s of task.sources || []) {
+    const key = JSON.stringify([s.url || s.title, s.version || ""]);
+    const entry = groups.get(key) || {
+      source: s,
+      levels: new Set(),
+      cited: false,
+    };
+    if (cited.has(s.source_id)) entry.cited = true;
+    for (const l of [s.reading_level, ...(s.read_levels || [])])
+      if (readingLevels[l]) entry.levels.add(readingLevels[l]);
+    groups.set(key, entry);
+  }
+  function listing(items) {
+    return (
+      '<ul class="list">' +
+      items
+        .map(({ source: s, levels }) => {
+          const version =
+            s.version == null
+              ? ""
+              : /^[0-9a-f]{16,}$/i.test(String(s.version))
+                ? "已保存原网页"
+                : /^\d+$/.test(String(s.version)) && s.source_type === "paper"
+                  ? "v" + s.version
+                  : String(s.version);
+          return (
+            "<li>" +
+            (s.url
+              ? '<a href="' +
+                safeURL(s.url) +
+                '" target="_blank" rel="noopener">' +
+                esc(s.title || s.url) +
+                " ↗</a>"
+              : esc(s.title || "引用材料")) +
+            '<p class="sub">' +
+            esc([version, ...levels].filter(Boolean).join(" · ")) +
+            "</p></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+  const used = [...groups.values()].filter((e) => e.cited),
+    other = [...groups.values()].filter((e) => !e.cited);
   return (
-    '<section class="source-fold"><h3>这一阶段查阅的材料</h3><ul class="list">' +
-    sources
-      .map(
-        (s) =>
-          "<li>" +
-          (s.url
-            ? '<a href="' +
-              safeURL(s.url) +
-              '" target="_blank" rel="noopener">' +
-              esc(s.title || s.url) +
-              " ↗</a>"
-            : esc(s.title || "引用材料")) +
-          '<div class="sub">' +
-          esc(
-            [s.version, readingLevels[s.reading_level]]
-              .filter(Boolean)
-              .join(" · "),
-          ) +
-          "</div></li>",
-      )
-      .join("") +
-    "</ul></section>"
+    (used.length
+      ? '<section class="source-fold"><h3>正文引用</h3>' +
+        listing(used) +
+        "</section>"
+      : "") +
+    (other.length
+      ? '<details class="source-fold"><summary>' +
+        (used.length ? "其他已登记的材料" : "已登记的材料") +
+        "</summary>" +
+        listing(other) +
+        "</details>"
+      : "")
   );
 }
 function originalText(value, sources) {
