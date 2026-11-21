@@ -130,6 +130,7 @@ from pydantic import BaseModel,Field
 
 
 class SectionRequest(BaseModel):
+    heading:str|None=Field(None,max_length=240)
     revision_id:str|None=None
     question:str|None=Field(None,max_length=1500)
 
@@ -147,15 +148,24 @@ def read_section(wid:str,focus:str,data:SectionRequest|None=None):
             AND l.status='done' AND (? IS NULL OR v.id=?) ORDER BY v.observed_at DESC,l.rowid DESC LIMIT 1""",
             (wid,request.revision_id,request.revision_id)).fetchone()
         if not row: raise ValueError("所选论文修订尚无可继续的精读记录")
-        start,size,heading=passage(row["body"],focus)
+        start,size,heading=passage(row["body"],focus,request.heading)
         if not heading: raise ValueError("已解析全文没有匹配的章节标题")
         payload={"key":row["work_key"],"origin_run_id":row["run_id"],"focus":focus,"revision_id":row["revision_id"]}
         if request.question: payload["question"]=request.question
+        if request.heading: payload["exact_heading"]=request.heading
         # Reuse a previously queued exact request, including legacy section jobs.
         past=db.execute("""SELECT id,run_id FROM jobs WHERE stage='read' AND json_extract(payload,'$.focus')=?
-             AND json_extract(payload,'$.revision_id')=? AND coalesce(json_extract(payload,'$.question'),'')=?
-             ORDER BY rowid LIMIT 1""",(focus,row["revision_id"],request.question or "")).fetchone()
+             AND json_extract(payload,'$.revision_id')=? AND coalesce(json_extract(payload,'$.question'),'')=? AND coalesce(json_extract(payload,'$.exact_heading'),'')=?
+             ORDER BY rowid LIMIT 1""",(focus,row["revision_id"],request.question or "",request.heading or "")).fetchone()
         if past: return {"job_id":past["id"],"run_id":past["run_id"],"heading":heading,"start":start,"end":start+size,"reused":True}
         rid=update_run(db)
         jid=job(db,rid,"read",payload);arrange(db,rid,("archive",))
         return {"job_id":jid,"run_id":rid,"heading":heading,"start":start,"end":start+size,"reused":False}
+
+@router.get("/api/works/{wid}/sections")
+def section_choices(wid:str,revision_id:str):
+    from .readings import section_catalog
+    with database() as db:
+        row=db.execute("SELECT v.body FROM revisions v JOIN documents d ON d.id=v.document_id WHERE v.id=? AND d.work_id=?",(revision_id,wid)).fetchone()
+        if not row: raise HTTPException(404,"所选作品修订不存在")
+        return section_catalog(row[0])

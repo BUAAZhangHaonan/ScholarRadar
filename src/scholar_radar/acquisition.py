@@ -265,7 +265,7 @@ async def reading(run, payload):
             ).fetchone()[0]
         )
     if payload.get("focus"):
-        return await read_paper({**p, "evidence_focus": payload["focus"],"target_revision_id":payload["revision_id"],"analysis_question":payload.get("question")}, rid)
+        return await read_paper({**p, "evidence_focus": payload["focus"],"target_revision_id":payload["revision_id"],"analysis_question":payload.get("question"),"exact_heading":payload.get("exact_heading")}, rid)
     try:
         result = await read_paper(p, rid)
     except Exception as exc:
