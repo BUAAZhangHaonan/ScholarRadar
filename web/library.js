@@ -53,13 +53,32 @@ async function detail(id){
       '<li><a href="'+pathFor("directions",d.id)+'">'+esc(d.title)+'</a>'+(d.title!==d.question?prose(d.question):"")+'</li>').join("")+'</ul></section>':"")+
     sourceLinks(work)+(records.length&&work.abstract?'<details class="rule-section"><summary>论文摘要</summary>'+prose(work.abstract)+'</details>':"")+
     objectFeedback("work",id,current.searchParams.get("snapshot"),current.searchParams.get("recommendation"))+
-    (records.length?'<details class="rule-section"><summary>继续补读</summary><form id="section-read" class="controls"><label>想核对的内容<select name="focus">'+
-      '<option value="evaluation">实验与结果</option><option value="method">方法</option><option value="limits">局限与讨论</option></select></label><button>加入补读</button></form></details>':"")+'</div>';
+    (records.length?'<details class="rule-section" id="follow-up-reading"><summary>继续补读</summary><form id="section-read" class="form"><label>想核对的内容<select name="focus">'+
+      '<option value="evaluation">实验与结果</option><option value="method">方法</option><option value="limits">局限与讨论</option></select></label><label>原文章节<select name="heading"><option value="">按问题匹配章节</option></select></label><label>希望核对的比较、证据或条件（可选）<textarea name="question" maxlength="1500"></textarea></label><button>加入补读</button></form></details>':"")+'</div>';
   enableActions($("#app"));
   if($("#paper-version"))$("#paper-version").onchange=e=>{current.searchParams.set("revision",e.target.value);location.assign(current)};
+  const followup=$("#follow-up-reading");
+  if(followup){
+    let loaded=false,loading=false;
+    followup.ontoggle=async()=>{
+      if(!followup.open||loaded||loading)return;
+      loading=true;
+      try{
+        const sections=await api("/api/works/"+encodeURIComponent(id)+"/sections?revision_id="+encodeURIComponent(chosen));
+        const field=$("#section-read").elements.heading;
+        const seen=new Set();
+        for(const item of sections){
+          if(typeof item.heading!=="string" || seen.has(item.heading))continue;
+          seen.add(item.heading);
+          const option=document.createElement("option");option.value=item.heading;option.textContent=item.heading;field.append(option);
+        }
+        loaded=true;
+      }catch(ex){msg("暂时无法读取章节目录，仍可按问题匹配章节。")}finally{loading=false}
+    };
+  }
   if($("#section-read"))$("#section-read").onsubmit=async e=>{
     e.preventDefault();const form=e.currentTarget,b=form.querySelector("button");b.disabled=true;
-    try{const resp=await send("/api/works/"+encodeURIComponent(id)+"/read-section/"+form.elements.focus.value,{revision_id:chosen});
+    try{const resp=await send("/api/works/"+encodeURIComponent(id)+"/read-section/"+form.elements.focus.value,{revision_id:chosen,heading:form.elements.heading.value||null,question:form.elements.question.value.trim()||null});
       msg((resp.reused?"已复用补读任务":"已提交补读")+" · "+resp.heading)}catch(ex){msg(ex.message)}finally{b.disabled=false}
   };
 }
