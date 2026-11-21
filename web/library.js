@@ -2,24 +2,28 @@ import {$,api,empty,esc,evid,modal,msg,safeURL,send} from "./common.js";
 import {enableActions,humanDate,objectFeedback,pathFor,prose} from "./reader.js";
 
 const scopeNames={overview:"阅读所得",evaluation:"实验与结果",method:"方法",limits:"适用条件与局限"};
-const namedFields=[["problem","研究问题"],["mechanism","方法关键点"],["comparison","最近邻与对照"],
+const namedFields=[["problem","研究问题"],["finding","研究发现"],["mechanism","方法关键点"],["comparison","最近邻与对照"],
   ["experiment","关键实验及其条件"],["conditions","结论适用于什么情形"],["reuse","可以复用的部分"],["open_question","下一步值得补清的问题"]];
-function citations(record){
-  return record.evidence_ids?.length?'<details class="source-fold"><summary>这次阅读的原文</summary><div class="row">'+
+function citations(record,label="这次阅读的原文"){
+  return record.evidence_ids?.length?'<details class="source-fold"><summary>'+esc(label)+'</summary><div class="row">'+
     record.evidence_ids.map((id,i)=>evid(id,"引文 "+(i+1))).join(" ")+'</div></details>':"";
 }
 function readingNotes(records){
   const mapped=records.filter(r=>r.sections&&Object.keys(r.sections).length);
+  const referenced=new Map();
   const blocks=namedFields.map(([key,title])=>{
     const entries=mapped.filter(r=>r.sections[key]);
     const preferred=key==="experiment"?entries.find(r=>r.focus==="evaluation"):
       key==="mechanism"?entries.find(r=>r.focus==="method"):null;
     const r=preferred||entries[0];
-    return r?'<section id="record-'+esc(r.id)+'-'+key+'"><h2>'+title+'</h2>'+prose(r.sections[key])+citations(r)+'</section>':"";
+    if(!r)return "";
+    const first=!referenced.has(r.id);referenced.set(r.id,r);
+    return '<section id="record-'+esc(r.id)+(first?"":"-"+key)+'"><h2>'+title+'</h2>'+prose(r.sections[key])+'</section>';
   }).join("");
   const legacy=records.filter(r=>!r.sections||!Object.keys(r.sections).length);
   legacy.sort((a,b)=>Number(b.focus==="overview")-Number(a.focus==="overview"));
-  return blocks+legacy.map(r=>'<section id="record-'+esc(r.id)+'"><h2>'+esc(scopeNames[r.focus]||"阅读记录")+'</h2>'+
+  const sources=[...referenced.values()].map(r=>citations(r,(r.heading||scopeNames[r.focus]||"研究记录")+"的原文")).join("");
+  return blocks+(sources?'<div>'+sources+'</div>':"")+legacy.map(r=>'<section id="record-'+esc(r.id)+'"><h2>'+esc(scopeNames[r.focus]||"阅读记录")+'</h2>'+
     (r.heading?'<p class="sub">'+esc(r.heading)+'</p>':"")+prose(r.answer)+citations(r)+'</section>').join("");
 }
 function sourceLinks(work){
@@ -31,7 +35,8 @@ function sourceLinks(work){
 async function detail(id){
   const work=await api("/api/reading/works/"+encodeURIComponent(id));
   const current=new URL(location.href),versions=[...new Set(work.records.map(r=>r.revision_id))];
-  const wanted=current.searchParams.get("revision");
+  const hinted=work.records.find(r=>r.id===current.searchParams.get("record"));
+  const wanted=current.searchParams.get("revision")||hinted?.revision_id;
   const chosen=versions.includes(wanted)?wanted:versions[0];
   const records=work.records.filter(r=>r.revision_id===chosen);
   const versionChoice=versions.length>1?'<label>论文版本<select id="paper-version">'+versions.map((v,i)=>{

@@ -16,6 +16,10 @@ function reportUrl(kind,date=""){
   if(date)q.set("date",date);
   return "/"+(q.size?"?"+q:"");
 }
+function paperUpdateUrl(item) {
+  const base=pathFor("works",item.work_id);
+  return item.record_id ? base+"?record="+encodeURIComponent(item.record_id)+"#record-"+encodeURIComponent(item.record_id) : base;
+}
 function mainStory(item){
   const target=directionLink(item.direction_id,item.snapshot_id);
   return '<article class="feature-story"><div class="eyeline">重点变化</div><h2>'+esc(item.title)+'</h2>'+
@@ -77,12 +81,12 @@ export async function render(){
     '</div><label class="compact-date">报告日期<input id="period-date" type="date" value="'+esc(selectedDate||report.date||"")+'"></label></div>';
   const headline=report.summary?'<section class="reading"><h2 class="section-title">本期判断</h2>'+prose(report.summary)+'</section>':"";
   const news=updates.length?'<section class="rule-section"><h2 class="section-title">'+(lead?"其他值得读的工作":"近期值得读的工作")+
-    '</h2><ul class="list">'+updates.map(u=>'<li><h3><a href="'+pathFor("works",u.work_id)+'">'+esc(u.title)+'</a></h3>'+
+    '</h2><ul class="list">'+updates.map(u=>'<li><h3><a href="'+paperUpdateUrl(u)+'">'+esc(u.title)+'</a></h3>'+
     prose(shortFinding(u.body))+'</li>').join("")+'</ul></section>':"";
   const watch=report.watch?.length?'<section class="rule-section"><h2 class="section-title">观察线索</h2><ul class="list">'+
     report.watch.map(w=>'<li><a href="'+directionLink(w.direction_id,w.snapshot_id)+'">'+esc(w.question)+'</a></li>').join("")+'</ul></section>':"";
   const solo=standalone?'<article class="feature-story"><div class="eyeline">重点阅读</div><h2>'+esc(standalone.title)+'</h2>'+
-    prose(shortFinding(standalone.body))+'<div class="story-actions"><a class="button" href="'+pathFor("works",standalone.work_id)+'">阅读研究记录</a></div></article>':"";
+    prose(shortFinding(standalone.body))+'<div class="story-actions"><a class="button" href="'+paperUpdateUrl(standalone)+'">阅读研究记录</a></div></article>':"";
   const none=(!lead&&!standalone&&!updates.length)?'<section class="panel">'+empty(report.state==="working"?"正在查阅这一期的材料。":report.state==="empty"?
     "这个日期还没有发布报告。":"这一期还没有形成新的研究判断。")+'<a href="/directions">继续阅读已有方向</a></section>':"";
   $("#app").innerHTML='<header class="page-head"><div><h1>'+heading+'</h1>'+(report.date?'<p class="sub">'+esc(report.date)+'</p>':"")+'</div>'+controls+
