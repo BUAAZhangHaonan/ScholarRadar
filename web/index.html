@@ -1,19 +1,46 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="color-scheme" content="light">
-    <title>ScholarRadar · 研究工作台</title><link rel="stylesheet" href="/static/site.css">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>ScholarRadar · 研究工作台</title>
+    <link rel="stylesheet" href="/static/site.css" />
   </head>
   <body>
-    <header class="mast"><div class="mast-inner">
-      <a class="brand" href="/"><i class="mark" aria-hidden="true"></i>ScholarRadar</a>
-      <nav aria-label="研究工作台"><a href="/">研究动态</a><a href="/directions">研究方向</a><a href="/tasks">研究任务</a><a href="/library">文献</a></nav>
-    </div></header>
+    <header class="mast">
+      <div class="mast-inner">
+        <a class="brand" href="/"
+          ><i class="mark" aria-hidden="true"></i>ScholarRadar</a
+        >
+        <nav aria-label="研究工作台">
+          <a href="/">研究动态</a><a href="/directions">研究方向</a
+          ><a href="/tasks">研究任务</a><a href="/library">文献</a>
+        </nav>
+      </div>
+    </header>
     <main id="app" class="shell" aria-live="polite"></main>
-    <footer><div class="foot-inner"><a href="/settings">个人设置</a><a href="/maintenance">运行维护</a></div></footer>
-    <dialog id="detail" aria-labelledby="detail-title"><header><strong id="detail-title">详情</strong><button type="button" id="close" class="quiet">关闭</button></header><section id="detail-body"></section></dialog>
-    <dialog id="evidence-drawer" aria-labelledby="evidence-title"><header><strong id="evidence-title">原文</strong><button type="button" id="evidence-close" class="quiet">返回阅读</button></header><section id="evidence-body" class="drawer-body"></section></dialog>
+    <footer>
+      <div class="foot-inner">
+        <a href="/settings">个人设置</a><a href="/maintenance">运行维护</a>
+      </div>
+    </footer>
+    <dialog id="detail" aria-labelledby="detail-title">
+      <header>
+        <strong id="detail-title">详情</strong
+        ><button type="button" id="close" class="quiet">关闭</button>
+      </header>
+      <section id="detail-body"></section>
+    </dialog>
+    <dialog id="evidence-drawer" aria-labelledby="evidence-title">
+      <header>
+        <strong id="evidence-title">原文</strong
+        ><button type="button" id="evidence-close" class="quiet">
+          返回阅读
+        </button>
+      </header>
+      <section id="evidence-body" class="drawer-body"></section>
+    </dialog>
     <p id="toast" role="status" hidden></p>
     <script type="module" src="/static/app.js"></script>
   </body>
