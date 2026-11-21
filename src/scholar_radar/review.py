@@ -2,6 +2,7 @@ import json
 from .db import database, key, rows
 from .models import ask
 from .profile import get_profile
+from .readings import section_catalog
 from .settings import dump, now
 
 
@@ -35,6 +36,12 @@ async def review(run):
                 }
                 for q in quotes
             ]
+            section_lists = {}
+            for source in quotes:
+                if source["work_id"] and source["revision_id"] not in section_lists:
+                    section_lists[source["revision_id"]] = [
+                        h["heading"] for h in section_catalog(source["body"])
+                    ]
             materials.append(
                 {
                     "id": "C" + str(i),
@@ -49,6 +56,7 @@ async def review(run):
                     "action": b.get("action"),
                     "user_compute_conditions": profile["compute"],
                     "evidence": evidence,
+                    "paper_sections": section_lists,
                 }
             )
     if not materials:
@@ -59,9 +67,9 @@ async def review(run):
         "逐卡独立复核。核对事实是否有给定原文依据、数据集与指标是否一致、岗位是否来自官方要求。研究资源的可安排程度以画像明确记录为准，条件性资源的方案保留前提。"
         "假设和未来判定条件应与已发生事实区分。仅因未来结果未知不能否定一个有根据的可证伪假设。"
         "每项返回 {id,verdict,reason,gap}，id=C1等。verdict取 supported 或 needs_evidence。"
-        "已支持填 gap=null。需要修改时 gap={kind,question,anchor,neighbor}；"
+        "已支持填 gap=null。需要修改时 gap={kind,question,anchor,heading,neighbor}；"
         "仅措辞有误时 kind=wording，缺实验证据填 experiment，缺方法填 method，缺限制填 conditions，缺最近邻比较填 neighbor。"
-        "question 写一个具体、可由材料回答的问题；anchor 逐字选一条来自目标论文的证据ID。"
+        "question 写一个具体、可由材料回答的问题；anchor 逐字选一条来自目标论文的证据ID。章节补查从该修订的 paper_sections 逐字选择最能回答问题的 heading，包括报告真实结果的描述性标题。"
         "neighbor 填需核查的真实论文题目/外部标识，尚无明确作品填空；确实无法补证填 unresolved。"
         "不要为一个清楚标明的未来验证要求预先提供其预期结果。必要条件未证实应作为开放问题保留。"
         "对有实质性错误的卡注明哪句话及缺少什么，不能用宽泛免责代替核对。",
@@ -129,7 +137,13 @@ async def review(run):
                     kind = "unresolved"
                 wid = anchor["work_id"] if anchor else None
                 rev = anchor["revision_id"] if anchor else None
-                gid = key("review gap", card["id"], kind, question, wid, rev)
+                heading = gap.get("heading")
+                known_headings = item["paper_sections"].get(rev, [])
+                if heading and (
+                    not isinstance(heading, str) or known_headings.count(heading) != 1
+                ):
+                    kind = "unresolved"
+                gid = key("review gap", card["id"], kind, question, wid, rev, heading)
                 db.execute(
                     "INSERT OR IGNORE INTO research_gaps VALUES(?,?,?,?,?,?,?,'open',NULL,?)",
                     (
@@ -143,6 +157,7 @@ async def review(run):
                         dump(
                             {
                                 "anchor": gap.get("anchor"),
+                                "heading": heading,
                                 "neighbor": gap.get("neighbor") or "",
                             }
                         ),

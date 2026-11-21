@@ -486,3 +486,29 @@ class Records(unittest.TestCase):
             after = asyncio.run(assessment.assess(self.run))["snapshots"]
         self.assertNotIn(before, after)
         self.assertEqual(len(after), 1)
+
+    def test_exact_section_matches_descriptive_heading_on_one_revision(self):
+        from scholar_radar.readings import section_catalog, passage
+
+        title = "4 The Role of Token Position in Hallucination Detection"
+        text = (
+            "# 3 Experimental Setup\nProtocol-only section.\n# "
+            + title
+            + "\nActual comparison.\n# 4.1 Stress test\nOpposite result.\n# 5 Limitations\nKnown scope."
+        )
+        start, size, heading = passage(text, "evaluation", exact_heading=title)
+        self.assertEqual(heading, title)
+        self.assertEqual(
+            text[start : start + size],
+            "# "
+            + title
+            + "\nActual comparison.\n# 4.1 Stress test\nOpposite result.\n",
+        )
+        with self.assertRaises(ValueError):
+            passage(text, "evaluation", exact_heading="The Role")
+        with self.assertRaises(ValueError):
+            passage("# X\nA\n# X\nB", "method", exact_heading="X")
+        self.assertEqual(
+            [x["heading"] for x in section_catalog("# X\n```sh\n# pretend\n```\n")],
+            ["X"],
+        )

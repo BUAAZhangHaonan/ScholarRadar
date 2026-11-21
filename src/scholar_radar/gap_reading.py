@@ -132,6 +132,7 @@ async def fill_gaps(run):
                     research_question=g["question"],
                     paper={"direction_ids": [g["direction_id"]]},
                     required_heading=True,
+                    exact_heading=json.loads(g["details"]).get("heading"),
                 )
         except Exception as exc:
             detail = {**json.loads(g["details"]), "barrier": str(exc)[:300]}
