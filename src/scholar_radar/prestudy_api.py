@@ -20,8 +20,8 @@ class Selection(BaseModel):
     request_id: str=Field(min_length=1,max_length=160)
 
 
-def runtime():
-    cfg=deployment().get("arc_runtime")
+def runtime(settings=None):
+    cfg=settings if settings is not None else deployment().get("arc_runtime")
     if not cfg or any(not cfg.get(k) for k in ("executable","config","env_file","data_dir")):
         raise ValueError("ARC 部署路径尚未配置")
     cfg=dict(cfg)
@@ -35,14 +35,18 @@ def runtime():
 def enqueue_selection(db,did,selection):
     focus=selection.focus.strip()
     if not focus: raise ValueError("请写明本次希望查清的具体问题")
+    bound=db.execute("""SELECT h.* FROM arc_requests r JOIN arc_handoffs h ON h.id=r.handoff_id WHERE r.request_id=?""",(selection.request_id,)).fetchone()
+    if bound:
+        requested_idea=json.loads(bound["bundle_json"]).get("idea_id")
+        if (bound["direction_id"],bound["snapshot_id"],bound["stage"],bound["focus"],requested_idea)!=(did,selection.snapshot_id,selection.stage,focus,selection.idea_id):
+            raise ValueError("该提交编号已经用于另一项选题")
+        return {"id":bound["id"],"task_id":bound["job_id"],"run_id":bound["radar_run_id"],"status":bound["status"],"reused":True}
     if selection.idea_id:
         linked=db.execute("SELECT runtime_json FROM arc_handoffs WHERE direction_id=? AND idea_id=? AND status='completed' ORDER BY updated_at DESC LIMIT 1",(did,selection.idea_id)).fetchone()
         if not linked: raise ValueError("这个想法尚未在当前方向完成可承接的预研")
-        cfg=json.loads(linked[0])
+        cfg=runtime(json.loads(linked[0]))
     else: cfg=runtime()
     hid,bundle=selected_bundle(db,did,selection.snapshot_id,selection.stage,focus,selection.idea_id)
-    mapped=db.execute("SELECT handoff_id FROM arc_requests WHERE request_id=?",(selection.request_id,)).fetchone()
-    if mapped and mapped[0]!=hid: raise ValueError("该提交编号已经用于另一项选题")
     old=db.execute("SELECT * FROM arc_handoffs WHERE id=?",(hid,)).fetchone()
     if not old:
         stamp=now(); rid=key("arc-stage",hid); profile=bundle["origin"]["profile_id"]
@@ -61,7 +65,7 @@ def present(row):
     obj={k:row[k] for k in ("id","direction_id","snapshot_id","profile_id","stage","focus","idea_id","arc_run_id","status","created_at","updated_at")}
     result=json.loads(row["result_json"] or "{}")
     obj.update({k:result.get(k) for k in ("execution_status","research_decision","evidence_limited","current_understanding",
-                "next_question","presentation_status","presentation","draft","draft_text","cited_source_ids","previous_stage","source_mapping")})
+                "next_question","presentation_status","presentation","draft","draft_text","cited_source_ids","previous_stage","source_mapping","stop_reason","polish_failure")})
     obj.update(direction_title=row["direction_title"],sources=result.get("source_directory",[]),error=row["error"])
     return obj
 

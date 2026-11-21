@@ -1,3 +1,4 @@
+import httpx
 from datetime import date
 from urllib.parse import urlsplit
 from .acquisition import coverage
@@ -106,7 +107,7 @@ async def verify_resources(run, limit=2):
             try:
                 files=await files_at(url)
                 with database(write=True) as db: register(db,item["id"],files)
-            except (OSError,ValueError,KeyError,__import__("httpx").HTTPError) as exc:
+            except (OSError,ValueError,KeyError,httpx.HTTPError) as exc:
                 with database(write=True) as db:
                     coverage(db,run["id"],"发布方文件清单","discovery",run["scope"],url,day,day,None,None,"unavailable",reason=type(exc).__name__)
             results.append(item["id"])

@@ -1,4 +1,5 @@
 """Route durable research-input changes to the affected questions."""
+import json
 from contextvars import ContextVar
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -88,11 +89,9 @@ def research_outcomes(db,did):
     for row in db.execute("""SELECT ev.id,ev.decision,ev.reason,ev.actual,ev.at,a.title,s.id snapshot_id
         FROM action_events ev JOIN actions a ON a.id=ev.action_id JOIN snapshots s ON s.id=a.snapshot_id
         WHERE s.dir_id=? AND ev.decision='completed' ORDER BY ev.at DESC LIMIT 8""",(did,)):
-        import json
         outcomes.append({"kind":"user_experiment","id":row["id"],"title":row["title"],"snapshot_id":row["snapshot_id"],
                          "actual":json.loads(row["actual"]),"reason":row["reason"],"at":row["at"]})
     for row in db.execute("SELECT id,snapshot_id,focus,result_json,updated_at FROM arc_handoffs WHERE direction_id=? AND status='completed' ORDER BY updated_at DESC LIMIT 6",(did,)):
-        import json
         result=json.loads(row["result_json"] or "{}")
         outcomes.append({"kind":"arc_prestudy","id":row["id"],"snapshot_id":row["snapshot_id"],"focus":row["focus"],
             "finding":result.get("current_understanding"),"next_question":result.get("next_question"),

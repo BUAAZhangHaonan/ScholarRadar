@@ -18,8 +18,11 @@ def remember(db,p):
 
 def eligible(db,profile_id,scope,limit,preferred=()):
     if limit<=0: return []
-    sql="""SELECT ci.*,w.title FROM candidate_inventory ci JOIN works w ON w.id=ci.work_id
-        WHERE NOT EXISTS(SELECT 1 FROM reading_records rr WHERE rr.work_id=ci.work_id)
+    sql="""SELECT ci.*,w.title,
+        (SELECT value FROM identifiers WHERE work_id=w.id AND namespace='arxiv' LIMIT 1) arxiv,
+        (SELECT value FROM identifiers WHERE work_id=w.id AND namespace='doi' LIMIT 1) canonical_doi FROM candidate_inventory ci JOIN works w ON w.id=ci.work_id
+        WHERE (EXISTS(SELECT 1 FROM identifiers pi WHERE pi.work_id=w.id AND pi.namespace IN ('arxiv','doi','s2','scholartrace')) OR json_extract(ci.body,'$.pdf_url') IS NOT NULL)
+        AND NOT EXISTS(SELECT 1 FROM reading_records rr WHERE rr.work_id=ci.work_id)
         AND NOT EXISTS(SELECT 1 FROM readings l WHERE json_extract(l.paper,'$.work_id')=ci.work_id AND l.status IN ('queued','done'))
         AND NOT EXISTS(SELECT 1 FROM candidate_decisions s WHERE s.work_id=ci.work_id AND s.profile_id=? AND s.scope=? AND s.version=ci.version)"""
     params=[profile_id,scope]
@@ -32,6 +35,8 @@ def eligible(db,profile_id,scope,limit,preferred=()):
     choices={}
     for v in priority+rest:
         p=json.loads(v["body"])
+        if not p.get("arxiv_id") and v["arxiv"]: p["arxiv_id"]=v["arxiv"]
+        if not p.get("doi") and v["canonical_doi"]: p["doi"]=v["canonical_doi"]
         if p.get("arxiv_id") or p.get("doi") or p.get("s2_id") or p.get("paper_id"):
             choices.setdefault(v["work_id"],{**p,"work_id":v["work_id"],"title":v["title"],"inventory_version":v["version"]})
         if len(choices)>=limit: break
