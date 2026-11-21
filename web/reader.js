@@ -42,7 +42,12 @@ export function prose(text) {
 
 export function materialLink(m) {
   if (!m) return "";
-  if (m.work_id) return '<a href="'+pathFor("works",m.work_id)+'">'+esc(m.title)+'</a>';
+  if (m.work_id) {
+    const query=new URLSearchParams();
+    if(m.snapshot_id)query.set("snapshot",m.snapshot_id);
+    if(m.recommendation_id)query.set("recommendation",m.recommendation_id);
+    return '<a href="'+pathFor("works",m.work_id)+(query.size?"?"+esc(query.toString()):"")+'">'+esc(m.title)+'</a>';
+  }
   return m.url?'<a href="'+safeURL(m.url)+'" rel="noopener" target="_blank">'+esc(m.title)+' ↗</a>':esc(m.title);
 }
 

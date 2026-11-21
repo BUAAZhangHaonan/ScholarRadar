@@ -17,7 +17,7 @@ export async function render(){
   $("#preferences").onsubmit=async e=>{
     e.preventDefault();const f=new FormData(e.target),bank=new Map(p.assets.map(a=>[a.name,a]));
     const newProfile={...p,goals:lines(f.get("goals")),current_actions:lines(f.get("projects")),
-      assets:lines(f.get("assets")).map(name=>bank.get(name)||{name,source:"用户填写"}),
+      assets:String(f.get("assets"))===p.assets.map(a=>a.name||"").join("\n") ? p.assets : lines(f.get("assets")).map(name=>bank.get(name)||{name,source:"用户填写"}),
       timezone:f.get("timezone"),daily_time:f.get("daily_time"),daily_limit:Number(f.get("daily_limit")),active_limit:Number(f.get("active_limit"))};
     try{await send("/api/profile",newProfile,"PUT");msg("个人设置已保存");await render()}catch(ex){msg(ex.message)}
   };

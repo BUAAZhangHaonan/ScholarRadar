@@ -50,6 +50,12 @@ def card_excerpt(db, direction_id, snapshot_id, card, evidence=None, action=None
             (snapshot_id,),
         ).fetchone()
         action = dict(a) if a else {}
+    action_id=action.get("action_id") or action.get("id")
+    if action_id:
+        live=db.execute("SELECT status FROM actions WHERE id=? AND snapshot_id=?",(action_id,snapshot_id)).fetchone()
+        if live: action={**action,"status":live[0]}
+    source_links=materials(evidence)
+    for link in source_links: link["snapshot_id"]=snapshot_id
     feasibility = card.get("feasibility") or {}
     if isinstance(feasibility, str):
         feasibility = {"asset": feasibility}
@@ -60,7 +66,7 @@ def card_excerpt(db, direction_id, snapshot_id, card, evidence=None, action=None
         "judgment": card.get("judgment"), "change": card.get("change"),
         "personal_fit": feasibility.get("asset"), "next_step": next_step or action.get("title"),
         "action_id": action.get("action_id") or action.get("id"), "action_state": action.get("status"),
-        "materials": materials(evidence), "followed": follow_state(db, direction_id),
+        "materials": source_links, "followed": follow_state(db, direction_id),
     }
 
 
@@ -82,7 +88,7 @@ def direction_summaries(db, layer=None, status=None):
             latest_judgment=projection.get("judgment"), latest_change=projection.get("change"),
             latest_updated_at=latest["generated_at"] if latest else d["created_at"],
             personal_fit_summary=projection.get("personal_fit"), next_action=projection.get("next_step"),
-            action_state=projection.get("action_state"), key_papers=projection.get("materials", []),
+            action_state=projection.get("action_state"), key_papers=[m for m in projection.get("materials", []) if m.get("work_id")],
             followed=follow_state(db,d["id"]),
             review_state="supported" if approved else ("watch" if latest else "tracking"),
         )
@@ -122,7 +128,11 @@ def project_report(db, kind, selected_date):
         target = next((s for s in items if s["snapshot_id"]==proposed.get("snapshot_id")), {})
         proposal = {"title":proposed["title"],"why":pick.get("why"),"action_id":pick["action_id"],
                     "snapshot_id":proposed.get("snapshot_id"),"direction_id":target.get("direction_id"),
-                    "details":proposed.get("details",{})}
+                    "details":proposed.get("details",{}),"status":target.get("action_state") or proposed.get("status")}
+    reading_links=materials(evidence[i] for i in review.get("readings",[]) if i in evidence)
+    for m in reading_links:
+        parent=next((it for it in items if any(set(m["citations"])&set(s["citations"]) for s in it["materials"])),None)
+        if parent: m["snapshot_id"]=parent["snapshot_id"]
     updates=report.get("research_updates")
     if updates is None:
         from .record_store import research_updates
@@ -142,7 +152,7 @@ def project_report(db, kind, selected_date):
         "summary":review.get("summary") or (items[0]["judgment"] if items else None),
         "items":items,"watch":[{"direction_id":w.get("dir_id"),"snapshot_id":w.get("id"),"question":w.get("question")}
                               for w in report.get("watch",[]) if w.get("dir_id")],
-        "readings":materials(evidence[i] for i in review.get("readings",[]) if i in evidence),
+        "readings":reading_links,
         "proposal":proposal,"updates":updates,"evolution":evolution,
     }
 

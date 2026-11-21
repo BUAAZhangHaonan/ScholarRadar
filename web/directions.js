@@ -78,7 +78,7 @@ async function listDirections(){
     '<label>状态<select name="status">'+options([["","全部"],["tracking","跟踪中"],["candidate","候选"],["accepted","已接受"],["active","进行中"],["deferred","暂缓"]],state)+'</select></label></form></header>'+
     '<div class="grid">'+(data.map(d=>'<article class="card direction-card"><p class="eyeline">'+esc(layers[d.layer]||"研究方向")+
     (d.followed?" · 已关注":"")+'</p><h2><a href="'+localUrl(d.id)+'">'+esc(d.title)+'</a></h2><div class="story-body">'+
-    prose(d.latest_judgment||d.question)+((d.latest_change&&d.latest_change!==d.latest_judgment)?prose(d.latest_change):"")+
+    prose(d.latest_judgment||(d.question!==d.title?d.question:d.method))+((d.latest_change&&d.latest_change!==d.latest_judgment)?prose(d.latest_change):"")+
     (d.personal_fit_summary?prose(d.personal_fit_summary):"")+(d.next_action?'<div class="story-next">'+prose(d.next_action)+'</div>':"")+
     '</div><div class="story-actions"><a class="button quiet" href="'+localUrl(d.id)+'">打开方向</a>'+
     followControl(d.id,d.followed,d.latest_snapshot_id)+'</div></article>').join("")||empty("没有符合筛选条件的方向。"))+'</div>';
