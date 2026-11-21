@@ -69,13 +69,20 @@ async def review(run):
         run["id"],
         max_tokens=2000,
     )
-    entries=data.get("reviews",data.get("cards"))
-    if not isinstance(entries,list):
+    entries = data.get("reviews", data.get("cards"))
+    if not isinstance(entries, list):
         raise ValueError("复核返回缺少结构化结果列表")
-    seq={r["id"]:r for r in entries if isinstance(r,dict) and r.get("id")}
-    expected={item["id"] for item in materials}
-    if set(seq)!=expected or len(entries)!=len(expected) or any(
-            r.get("verdict") not in {"supported","needs_evidence"} or not r.get("reason") for r in seq.values()):
+    seq = {r["id"]: r for r in entries if isinstance(r, dict) and r.get("id")}
+    expected = {item["id"] for item in materials}
+    if (
+        set(seq) != expected
+        or len(entries) != len(expected)
+        or any(
+            r.get("verdict") not in {"supported", "needs_evidence"}
+            or not r.get("reason")
+            for r in seq.values()
+        )
+    ):
         raise ValueError("复核返回缺少已提交方向的明确结论")
     with database(write=True) as db:
         for card, item in zip(cards, materials):

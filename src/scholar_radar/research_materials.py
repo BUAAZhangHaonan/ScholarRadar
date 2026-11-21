@@ -161,6 +161,13 @@ def paper_material(db, wid, cutoff, priority_record_ids=()):
     )
     for r in paper["resources"]:
         r["details"] = json.loads(r["details"])
+    paper["artifacts"] = rows(
+        db,
+        """SELECT a.id,a.kind,a.path,a.version,a.url,a.source_url,a.evidence_id,e.quote
+        FROM work_resources wr JOIN verified_artifacts a ON a.resource_id=wr.resource_id JOIN evidence e ON e.id=a.evidence_id
+        WHERE wr.work_id=? AND a.first_verified_at<=? ORDER BY a.kind,a.path,a.version""",
+        (wid, cutoff),
+    )
     return paper
 
 
@@ -237,12 +244,18 @@ def signature(direction, profile, scope, papers, jobs, versions, results):
         )
         for wid, p in sorted(papers.items())
     ]
+    artifacts = [
+        (wid, a["id"], a["version"], a["evidence_id"])
+        for wid, p in sorted(papers.items())
+        for a in p["artifacts"]
+    ]
     return key(
         "direction-assessment-v3",
         direction,
         profile,
         scope,
         work_state,
+        artifacts,
         sorted(j["id"] for j in jobs),
         versions,
         results,

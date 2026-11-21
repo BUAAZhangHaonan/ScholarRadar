@@ -78,6 +78,18 @@ def validate_card(card, papers, jobs):
     if not works or not set(works) <= papers.keys():
         raise ValueError("方向引用了输入之外的作品")
     allowed = {eid for w in works for eid in papers[w]["quotes"]}
+    linked = [r for wid in works for r in papers[wid].get("reading_records", [])]
+    record_ids = card.get("reading_record_ids") or []
+    if record_ids and (
+        not isinstance(record_ids, list)
+        or not set(record_ids) <= {r["id"] for r in linked}
+    ):
+        raise ValueError("方向引用了本次材料以外的论文分析")
+    asset_ids = card.get("resource_evidence_ids") or []
+    if not isinstance(asset_ids, list) or not set(asset_ids) <= {
+        a["evidence_id"] for wid in works for a in papers[wid].get("artifacts", [])
+    }:
+        raise ValueError("资源状态缺少实际文件或发布条目的核验依据")
     if not ids or not set(ids) <= allowed:
         raise ValueError("方向引用了输入之外的论文证据")
     timeline = []
@@ -162,7 +174,7 @@ def persist_card(db, run, profile, card, ids, works, papers, sig):
             (did, wid, "1", dump(ids), now()),
         )
     jobids = (card.get("job_match") or {}).get("evidence_ids", [])
-    refs = sorted(set(ids) | set(jobids))
+    refs = sorted(set(ids) | set(jobids) | set(card.get("resource_evidence_ids") or []))
     old = db.execute(
         "SELECT id FROM snapshots WHERE dir_id=? ORDER BY generated_at DESC LIMIT 1",
         (did,),
@@ -201,7 +213,10 @@ def persist_card(db, run, profile, card, ids, works, papers, sig):
     )
     for wid in works:
         for record in papers[wid]["reading_records"]:
-            if set(record["evidence_ids"]) & set(ids):
+            explicit = card.get("reading_record_ids") or []
+            if record["id"] in explicit or (
+                not explicit and set(record["evidence_ids"]) & set(ids)
+            ):
                 db.execute(
                     "INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",
                     (sid, record["id"]),
@@ -300,6 +315,7 @@ async def assess(run, direction_ids=None):
     saved = []
     rejected = []
     handled = []
+    failed_event_ids = set()
     for target, trigger in grouped.items():
         direction = catalog.get(target)
         with database() as db:
@@ -388,12 +404,12 @@ async def assess(run, direction_ids=None):
                     (target, profile["id"], sig, run["id"], now()),
                 )
         if errors:
+            failed_event_ids.update(e["id"] for e in trigger)
             rejected.extend(errors)
         else:
             handled.extend(e["id"] for e in trigger)
-    if not rejected:
-        with database(write=True) as db:
-            changes.consume(db, set(handled))
+    with database(write=True) as db:
+        changes.consume(db, set(handled) - failed_event_ids)
     if rejected:
         raise ValueError("方向卡校验失败：" + " / ".join(rejected))
     return {"snapshots": saved, "processed_changes": list(dict.fromkeys(handled))}

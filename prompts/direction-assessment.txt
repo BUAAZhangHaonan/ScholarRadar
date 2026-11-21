@@ -14,3 +14,5 @@
 - action 为 {kind,title,control,metric,stop,effort}，kind=read/verify/observe。只建议一个与现有条件相称的动作，写清产物。不要设定来源中没有的精确提升幅度。
 
 标题与正文使用自然中文，聚焦研究问题、证据带来的变化和下一步。
+
+reading_record_ids 记录本次真正用到的论文分析（W1R1 等）。资源实际开放的判断另给 resource_evidence_ids（W1A1 等），并说明已查到哪次发布、哪个文件。仅访问到页面时仍可写作者声明及待核验的要件。不要把运行解析服务的设备、按需申请的计算资源写成已经预留的训练预算。
