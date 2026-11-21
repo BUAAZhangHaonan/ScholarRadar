@@ -2,10 +2,11 @@ import json
 from datetime import date, timedelta
 
 from .bibliography import external_key, recent_candidates, shortlist
-from .db import database, key
+from .db import database, key,rows
 from .discovery import discover_papers
 from .evidence import arxiv_id, work
 from .profile import get_profile
+from .candidate_pool import remember,eligible,mark
 from .queue import job
 from .readings import read_paper
 from .settings import VAR, atomic_text, dump
@@ -105,7 +106,17 @@ async def collect(run):
             )
     except Exception as exc:
         issues.append(("ScholarTrace", str(exc)[:220]))
-    if cold or not gathered:
+    def register(db,p):
+        try: ident=external_key(p)
+        except (TypeError,AttributeError): return None
+        if not ident: return None
+        p["work_id"]=work(db,p["title"],identifiers(p),p)
+        remember(db,p)
+        return p["work_id"]
+    with database(write=True) as db:
+        first=[register(db,p) for p in gathered]
+        backlog=eligible(db,run["profile_id"],run["scope"],20 if cold else 3,[v for v in first if v])
+    if (cold and len(backlog)<20) or (not cold and len(backlog)<3):
         try:
             extra, batches = await recent_candidates(day, cold, rid)
             gathered.extend(extra)
@@ -156,7 +167,7 @@ async def collect(run):
                 reason=error,
             )
         for p in items.values():
-            p["work_id"] = work(db, p["title"], identifiers(p), p)
+            register(db,p)
     atomic_text(folder(rid) / "candidates.json", dump(list(items.values())))
     if not items and issues:
         raise ValueError(str(issues))
@@ -167,25 +178,26 @@ async def screen(run):
     rid = run["id"]
     items = json.loads((folder(rid) / "candidates.json").read_text())
     cold = json.loads(run["detail"])["cold"]
+    limit=20 if cold else 3
+    with database() as db: profile=get_profile(db,run["profile_id"])
+    preferred=[p["work_id"] for p in items if p.get("work_id")]
     with database() as db:
-        profile = get_profile(db, run["profile_id"])
-        known = {
-            r[0]
-            for r in db.execute(
-                "SELECT DISTINCT d.work_id FROM documents d JOIN revisions v ON d.id=v.document_id JOIN evidence e ON e.revision_id=v.id"
-            )
-        }
-    candidates = [p for p in items if cold or p["work_id"] not in known]
-    limit = 20 if cold else 3
-    selection = await shortlist(candidates, profile, limit, rid)
-    # Preserve an already verified historical anchor without calling its analysis again.
-    anchors = [p for p in candidates if p["work_id"] in known]
-    if (
-        cold
-        and anchors
-        and all(p["work_id"] != anchors[0]["work_id"] for p in selection)
-    ):
-        selection = [*selection[: limit - 1], anchors[0]]
+        done=rows(db,"SELECT material FROM selection_material WHERE run_id=? ORDER BY rowid",(rid,))
+        considered=rows(db,"SELECT ci.body,c.work_id FROM candidate_decisions c JOIN candidate_inventory ci ON ci.work_id=c.work_id WHERE c.run_id=? ORDER BY c.rowid",(rid,))
+    selection=[json.loads(x["material"]) for x in done]
+    candidates=[{**json.loads(x["body"]),"work_id":x["work_id"]} for x in considered]
+    # Alternate new discoveries and the oldest untouched work. Each considered
+    # abstract advances the inventory, including when the result is empty.
+    for _ in range(max(0,(4 if cold else 2)-(len(candidates)+23)//24)):
+        with database() as db:
+            batch=eligible(db,profile["id"],run["scope"],24,preferred)
+        if not batch or len(selection)>=limit: break
+        choices=await shortlist(batch,profile,limit-len(selection),rid)
+        with database(write=True) as db:
+            mark(db,run,batch,choices)
+            for p in choices:
+                db.execute("INSERT OR IGNORE INTO selection_material VALUES(?,?,?)",(rid,p["work_id"],dump(p)))
+        candidates.extend(batch); selection.extend(choices)
     with database(write=True) as db:
         for p in selection:
             wk = external_key(p)
@@ -223,7 +235,11 @@ async def screen(run):
                 run["as_of"],
             ),
         )
-    return {"selected": len(selection), "candidate_count": len(items)}
+        from .recommendations import record,paper_features
+        for p in selection:
+            record(db,"work",p["work_id"],p.get("selection_reason") or "",paper_features(p),
+                   pid=run["profile_id"],evaluation=key("baseline",rid),origin="screen",used=p.get("feedback_ids",[]))
+    return {"selected": len(selection), "candidate_count": len(candidates)}
 
 
 async def reading(run, payload):

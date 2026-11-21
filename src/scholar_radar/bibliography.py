@@ -111,84 +111,34 @@ async def shortlist(papers, profile, limit, run_id=None):
     if not papers:
         return []
     items = {external_key(p): p for p in papers}
-    words = (
-        "hallucinat",
-        "constraint",
-        "instruction",
-        "tool",
-        "abstention",
-        "representation",
-        "selective",
-        "agent",
-        "calibrat",
-        "conflict",
-        "before",
-        "uncertaint",
-    )
-
-    def priority(pair):
-        p = pair[1]
-        return (
-            sum(w in p["title"].lower() for w in words),
-            bool(p.get("arxiv_id")),
-            p.get("published_date") or "",
-        )
-
-    subset = dict(sorted(items.items(), key=priority, reverse=True)[:85])
-    records = [
-        {
-            "id": i,
-            "title": p["title"],
-            "abstract": (p.get("abstract") or "")[:450],
-            "date": p.get("published_date"),
-        }
-        for i, p in subset.items()
-    ]
     from .shadow import active_signals
-    from .db import database
+    from .db import database,rows
     from .settings import now
-
+    from .recommendations import signals
     with database() as db:
-        if db.execute(
-            "SELECT 1 FROM proposals WHERE lifecycle='active' LIMIT 1"
-        ).fetchone():
-            cutoff = now()
-            for row in records:
-                row["active_factors"] = active_signals(
-                    db, subset[row["id"]].get("work_id"), cutoff
-                )
-    instr = (
-        "从本次真实候选选出与研究问题最贴近、具有具体实验或可复用资源的材料。排除领域只可作为旁证。"
-        "输出 {selected:[{id,reason,theme,evidence_focus}]}，id必须来自候选。按问题选择 evidence_focus：evaluation、method 或 limits。保留少量相邻和方法上不同的材料，"
-        "根据候选质量决定是否选满，不选重复工作。"
-    )
-    result = await ask(
-        "screen",
-        profile["fast_model"],
-        instr,
-        {
-            "goals": profile["goals"],
-            "exclude": profile["excluded_topics"],
-            "limit": limit,
-            "candidates": records,
-        },
-        run_id,
-    )
-    chosen = []
-    seen = set()
-    for x in result.get("selected", []):
-        i = x.get("id")
-        if i not in subset or i in seen:
-            continue
-        seen.add(i)
-        chosen.append(
-            {
-                **subset[i],
-                "selection_reason": x.get("reason"),
-                "evidence_focus": x.get("evidence_focus", "evaluation"),
-                "theme_hint": x.get("theme"),
-            }
-        )
-        if len(chosen) >= limit:
-            break
+        taxonomy=rows(db,"SELECT id,question FROM directions WHERE status!='merged' ORDER BY id")
+        feedback=signals(db,limit=10)
+        labels={r["id"] for r in feedback}
+        allowed_directions={d["id"] for d in taxonomy}
+        cutoff=now()
+        records=[{"id":ident,"title":p["title"],"abstract":p.get("abstract") or "",
+                  "date":p.get("published_date") or p.get("year"),
+                  "features":active_signals(db,p.get("work_id"),cutoff)} for ident,p in items.items()]
+    prompt=("从给定候选选出确实对当前问题有帮助的工作，细读完整摘要，不按标题热词选。"
+        "结合明确评价过的对象与具体原因，区分支持、反例、限制和相邻机会。"
+        "输出 {selected:[{id,reason,theme,evidence_focus,direction_ids,feedback_ids}]}。"
+        "direction_ids 和 feedback_ids 只引用所给 ID，未使用则填空数组。"
+        "evidence_focus 取 evaluation/method/limits。无相关材料返回空数组。")
+    result=await ask("screen",profile["fast_model"],prompt,{"goals":profile["goals"],"exclude":profile["excluded_topics"],
+                     "directions":taxonomy,"explicit_feedback":feedback,"limit":limit,"candidates":records},run_id)
+    chosen=[]; seen=set()
+    for item in result.get("selected",[]):
+        ident=item.get("id")
+        if ident not in items or ident in seen: continue
+        seen.add(ident)
+        chosen.append({**items[ident],"selection_reason":str(item.get("reason") or ""),
+            "evidence_focus":item.get("evidence_focus") if item.get("evidence_focus") in ("method","evaluation","limits") else "evaluation",
+            "theme_hint":item.get("theme"),"direction_ids":[d for d in (item.get("direction_ids") or []) if d in allowed_directions],
+            "feedback_ids":[f for f in (item.get("feedback_ids") or []) if f in labels]})
+        if len(chosen)>=limit: break
     return chosen
