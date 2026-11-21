@@ -1,155 +1,79 @@
-import { $, api, esc, txt, evid, list, empty, heading } from "./common.js";
-const periods = { daily: "日报", weekly: "周报", monthly: "月报" };
-function card(s) {
-  const d = s.card,
-    f = d.forecast;
-  const history = d.history
-    .map(
-      (h) =>
-        "<li><time>" +
-        esc(h.date || "观察于 " + h.first_observed.slice(0, 10)) +
-        "</time>" +
-        esc(h.event) +
-        " " +
-        evid(h.evidence_ids[0], "原文") +
-        "</li>",
-    )
-    .join("");
-  return (
-    '<article class="card feature"><h2>' +
-    esc(d.title) +
-    "</h2><p>" +
-    esc(d.judgment) +
-    '</p><div class="label">研究脉络</div><ol class="timeline">' +
-    history +
-    '</ol><div class="label">本次变化</div><p>' +
-    esc(d.change) +
-    '</p><div class="label">待验证的预测 · ' +
-    esc(f.horizon) +
-    "</div><p>" +
-    esc(f.hypothesis) +
-    "</p><details><summary>什么证据会改变这个判断</summary><p>支持条件　" +
-    esc(txt(f.confirm)) +
-    "</p><p>反例条件　" +
-    esc(txt(f.refute)) +
-    '</p></details><div class="label">下一步</div><p>' +
-    esc(d.action.title) +
-    '</p><a href="/directions?id=' +
-    encodeURIComponent(s.direction_id) +
-    '">查看方向历史 ↗</a></article>'
-  );
+import {$,api,empty,esc,evid} from "./common.js";
+import {acceptControl,enableActions,followControl,humanDate,materialList,pathFor,prose} from "./reader.js";
+
+const periods={daily:"日报",weekly:"周报",monthly:"月报"};
+function directionLink(id,snapshot){
+  return pathFor("directions",id)+(snapshot?"?snapshot="+encodeURIComponent(snapshot):"");
 }
-export async function render(kind = "daily", day = "") {
-  const [data, status] = await Promise.all([
-    api(
-      "/api/daily?kind=" +
-        kind +
-        (day ? "&date=" + encodeURIComponent(day) : ""),
-    ),
-    api("/api/status"),
-  ]);
-  const sources = data.coverage?.sources || [];
-  const sourceStates = [...new Map(sources.map((s) => [s.source, s])).values()];
-  const review = data.review;
-  $("#app").innerHTML =
-    heading(
-      kind === "daily"
-        ? "今日变化"
-        : kind === "weekly"
-          ? "每周研究判断"
-          : "每月复盘",
-      data.date ? data.date + " · 北京时间" : "按发布日期查看",
-    ) +
-    '<div class="controls"><div class="chips">' +
-    Object.entries(periods)
-      .map(
-        ([k, v]) =>
-          '<button class="chip ' +
-          (kind === k ? "active" : "") +
-          '" data-period="' +
-          k +
-          '">' +
-          v +
-          "</button>",
-      )
-      .join("") +
-    '</div><label>报告日期<input id="report-date" type="date" value="' +
-    esc(day || data.date || "") +
-    '"></label></div><div class="layout"><div class="stack">' +
-    (review
-      ? '<section class="panel"><h2>本期判断</h2><p>' +
-        esc(review.summary) +
-        '</p><div class="row">' +
-        (review.readings || [])
-          .map((id, i) =>
-            evid(
-              id,
-              (data.evidence || []).find((e) => e.id === id)?.title ||
-                "精读 " + (i + 1),
-            ),
-          )
-          .join(" ") +
-        "</div></section>"
-      : "") +
-    ((data.directions || []).map(card).join("") ||
-      '<section class="panel">' +
-        empty(
-          data.pending
-            ? "所选日期暂无已发布报告。"
-            : "当期没有通过证据校验的新变化。已有方向和历史证据可以在方向库查看。",
-        ) +
-        "</section>") +
-    ((data.watch || []).length
-      ? '<section class="panel"><h3>保持观察</h3>' +
-        list(
-          data.watch.map(
-            (w) =>
-              '<a href="/directions?id=' +
-              encodeURIComponent(w.dir_id) +
-              '">' +
-              esc(w.question) +
-              "</a><details><summary>待补的证据</summary><p>" +
-              esc(w.reason) +
-              "</p></details>",
-          ),
-        ) +
-        "</section>"
-      : "") +
-    '</div><aside class="stack"><section class="panel"><h3>来源覆盖</h3>' +
-    (sourceStates.length
-      ? list(
-          sourceStates.map(
-            (s) =>
-              "<strong>" +
-              esc(s.source) +
-              "</strong><br><small>" +
-              esc(
-                s.status === "ok" || s.status === "success"
-                  ? "已取得记录"
-                  : s.reason ===
-                      "Some retrieval sources failed; coverage is incomplete."
-                    ? "部分检索来源未完成"
-                    : s.reason || s.status,
-              ) +
-              "</small>",
-          ),
-        )
-      : empty("报告完成后显示本期采集范围。")) +
-    '</section><section class="panel"><h3>证据库</h3><p><span class="meta">' +
-    esc(status.works) +
-    '</span> 项作品　<span class="meta">' +
-    esc(status.evidence) +
-    '</span> 处原文</p><a href="/library">检索材料 ↗</a></section>' +
-    (data.cost
-      ? '<section class="panel"><h3>本期调用</h3><p class="meta">已知下界 ¥' +
-        esc(data.cost.known_lower) +
-        "<br>待核算 " +
-        esc(data.cost.unknown) +
-        ' 项</p><a href="/settings">查看运行记录 ↗</a></section>'
-      : "") +
-    "</aside></div>";
-  document
-    .querySelectorAll("[data-period]")
-    .forEach((b) => (b.onclick = () => render(b.dataset.period)));
-  $("#report-date").onchange = (e) => render(kind, e.target.value);
+function shortFinding(text){
+  if(typeof text!=="string")return "";
+  const opening=text.trim().split(/\n\s*\n/)[0];
+  return opening.match(/^.{1,210}?[。！？](?=\s|[^”’]|$)/u)?.[0] || opening;
+}
+function reportUrl(kind,date=""){
+  const q=new URLSearchParams();
+  if(kind!=="daily")q.set("kind",kind);
+  if(date)q.set("date",date);
+  return "/"+(q.size?"?"+q:"");
+}
+function mainStory(item){
+  const target=directionLink(item.direction_id,item.snapshot_id);
+  return '<article class="feature-story"><div class="eyeline">重点变化</div><h2>'+esc(item.title)+'</h2>'+
+    '<div class="story-body">'+prose(item.change)+prose(item.personal_fit)+
+    (item.next_step?'<div class="story-next"><p>'+esc(item.next_step)+'</p></div>':"")+
+    '</div><div class="story-actions"><a class="button" href="'+target+'">查看研究切口</a>'+
+    followControl(item.direction_id,item.followed,item.snapshot_id)+'</div>'+
+    (item.materials?.length?'<details class="source-fold"><summary>关键材料</summary>'+materialList(item.materials)+'</details>':"")+
+    '</article>';
+}
+function restStory(item){
+  return '<li><h3><a href="'+directionLink(item.direction_id,item.snapshot_id)+'">'+esc(item.title)+'</a></h3>'+
+    prose(item.change||item.judgment)+'</li>';
+}
+function weeklyProposal(p){
+  if(!p)return "";
+  const detail=p.details||{};
+  return '<section class="rule-section"><h2 class="section-title">可推进的验证</h2><h3>'+esc(p.title)+'</h3>'+
+    '<div class="story-body">'+prose(p.why)+prose(detail.control)+'</div><div class="story-actions">'+
+    (p.direction_id?'<a class="button" href="'+directionLink(p.direction_id,p.snapshot_id)+'">查看研究切口</a>':"")+
+    acceptControl(p.action_id,p.status||"proposed")+'</div></section>';
+}
+function periodEvolution(chains){
+  if(!chains?.length)return "";
+  return '<section class="rule-section"><h2 class="section-title">这一期如何演变</h2>'+
+    chains.map(d=>'<details><summary>'+esc(d.title)+'</summary><ol class="timeline">'+
+      d.nodes.map(n=>'<li><time>'+esc(humanDate(n.date))+'</time>'+
+        (n.verdict==="needs_evidence"?"待补证据":esc(n.change||n.judgment||""))+
+        (n.snapshot_id&&d.direction_id?'　<a href="'+directionLink(d.direction_id,n.snapshot_id)+'">查看当时判断</a>':"")+
+        (n.evidence_ids?.length?'　'+evid(n.evidence_ids[0],"读引文"):"")+'</li>').join("")+
+      '</ol></details>').join("")+'</section>';
+}
+export async function render(){
+  const q=new URLSearchParams(location.search);
+  const kind=Object.hasOwn(periods,q.get("kind"))?q.get("kind"):"daily";
+  const selectedDate=q.get("date")||"";
+  const request=new URLSearchParams({kind});if(selectedDate)request.set("date",selectedDate);
+  const report=await api("/api/reading/report?"+request);
+  const [lead,...other]=report.items||[];
+  const updates=report.updates||[];
+  const heading=kind==="daily"?"研究动态":kind==="weekly"?"每周研究判断":"每月研究复盘";
+  document.title=heading+" · ScholarRadar";
+  const controls='<div class="section-tools"><div class="periods" aria-label="报告周期">'+Object.entries(periods).map(([v,n])=>
+    '<a href="'+reportUrl(v,selectedDate)+'"'+(v===kind?' aria-current="page"':"")+'>'+n+'</a>').join("")+
+    '</div><label class="compact-date">报告日期<input id="period-date" type="date" value="'+esc(selectedDate||report.date||"")+'"></label></div>';
+  const headline=report.summary?'<section class="reading"><h2 class="section-title">本期判断</h2>'+prose(report.summary)+'</section>':"";
+  const news=updates.length?'<section class="rule-section"><h2 class="section-title">'+(lead?"其他值得读的工作":"近期值得读的工作")+
+    '</h2><ul class="list">'+updates.map(u=>'<li><h3><a href="'+pathFor("works",u.work_id)+'">'+esc(u.title)+'</a></h3>'+
+    prose(shortFinding(u.body))+'</li>').join("")+'</ul></section>':"";
+  const watch=report.watch?.length?'<section class="rule-section"><h2 class="section-title">观察线索</h2><ul class="list">'+
+    report.watch.map(w=>'<li><a href="'+directionLink(w.direction_id,w.snapshot_id)+'">'+esc(w.question)+'</a></li>').join("")+'</ul></section>':"";
+  const none=(!lead&&!updates.length)?'<section class="panel">'+empty(report.state==="working"?"正在查阅这一期的材料。":report.state==="empty"?
+    "这个日期还没有发布报告。":"这一期还没有形成新的研究判断。")+'<a href="/directions">继续阅读已有方向</a></section>':"";
+  $("#app").innerHTML='<header class="page-head"><div><h1>'+heading+'</h1>'+(report.date?'<p class="sub">'+esc(report.date)+'</p>':"")+'</div>'+controls+
+    '</header><div class="flow">'+headline+(lead?mainStory(lead):"")+none+
+    (other.length?'<section class="rule-section"><h2 class="section-title">其他变化</h2><ul class="list">'+other.map(restStory).join("")+'</ul></section>':"")+
+    news+weeklyProposal(report.proposal)+periodEvolution(report.evolution)+
+    (report.readings?.length?'<section class="rule-section"><h2 class="section-title">本期精读</h2>'+materialList(report.readings)+'</section>':"")+watch+'</div>';
+  $("#period-date").onchange=e=>location.assign(reportUrl(kind,e.target.value));
+  enableActions($("#app"));
 }
