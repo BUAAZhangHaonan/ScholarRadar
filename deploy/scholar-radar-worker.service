@@ -9,6 +9,7 @@ ExecStart=%h/zhanghaonan/ScholarRadar/.venv/bin/scholar-radar worker
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
 Environment=TMPDIR=%h/zhanghaonan/ScholarRadar/var/staging
+EnvironmentFile=-%h/zhanghaonan/ScholarRadar/var/private/github-results.env
 UMask=0077
 Restart=on-failure
 RestartSec=8
