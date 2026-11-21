@@ -29,7 +29,19 @@ async def command(cfg,operation,hid,stdin=None):
 def save_result(hid,data):
     with database(write=True) as db:
         h=db.execute("SELECT * FROM arc_handoffs WHERE id=?",(hid,)).fetchone()
-        if data["origin"]["snapshot_id"]!=h["snapshot_id"] or data["origin"]["direction_id"]!=h["direction_id"] or (h["arc_run_id"] and h["arc_run_id"]!=data["run_id"]):
+        if not h:
+            raise ValueError("未找到这次 ARC 提交")
+        bundle = json.loads(h["bundle_json"])
+        if (
+            data.get("handoff_id") != hid
+            or data.get("origin") != bundle["origin"]
+            or data.get("stage") != h["stage"]
+            or data.get("focus") != h["focus"]
+            or not data.get("run_id")
+            or not data.get("idea_id")
+            or (h["arc_run_id"] and h["arc_run_id"] != data["run_id"])
+            or (h["idea_id"] and h["idea_id"] != data["idea_id"])
+        ):
             raise ValueError("ARC 结果不属于选定的方向与阶段")
         status=data["execution_status"]
         db.execute("UPDATE arc_handoffs SET idea_id=?,arc_run_id=?,status=?,result_json=?,updated_at=?,error=NULL WHERE id=?",
