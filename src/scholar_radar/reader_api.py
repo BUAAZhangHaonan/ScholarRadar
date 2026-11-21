@@ -123,13 +123,27 @@ def project_report(db, kind, selected_date):
         proposal = {"title":proposed["title"],"why":pick.get("why"),"action_id":pick["action_id"],
                     "snapshot_id":proposed.get("snapshot_id"),"direction_id":target.get("direction_id"),
                     "details":proposed.get("details",{})}
+    updates=report.get("research_updates")
+    if updates is None:
+        from .record_store import research_updates
+        updates=research_updates(db,row["run_id"],limit=8) if kind=="daily" else []
+        as_of=report.get("generated_at")
+        if as_of:
+            updates=[u for u in updates if db.execute("SELECT 1 FROM reading_records WHERE id=? AND recorded_at<=?",(u["record_id"],as_of)).fetchone()]
+    used={m["work_id"] for item in items for m in item["materials"]}
+    updates=[u for u in updates if u.get("work_id") not in used][:3]
+    evolution=[{"direction_id":d.get("direction_id"),"title":d.get("title"),
+                "nodes":[{"snapshot_id":n.get("snapshot_id"),"date":n.get("date"),"judgment":n.get("judgment"),
+                          "change":n.get("change"),"verdict":n.get("verdict"),"evidence_ids":n.get("evidence_ids",[]),
+                          "actions":n.get("actions",[]),"feedback":n.get("feedback",[])} for n in d.get("nodes",[])]}
+               for d in report.get("evolution",[])]
     return {
         "date":report.get("date"), "kind":kind,"state":"published",
         "summary":review.get("summary") or (items[0]["judgment"] if items else None),
         "items":items,"watch":[{"direction_id":w.get("dir_id"),"snapshot_id":w.get("id"),"question":w.get("question")}
                               for w in report.get("watch",[]) if w.get("dir_id")],
         "readings":materials(evidence[i] for i in review.get("readings",[]) if i in evidence),
-        "proposal":proposal,"updates":[],
+        "proposal":proposal,"updates":updates,"evolution":evolution,
     }
 
 
