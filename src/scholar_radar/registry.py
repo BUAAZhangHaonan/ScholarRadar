@@ -1,9 +1,11 @@
 import json
 from .db import key
+from .record_store import backfill
 from .settings import ROOT, dump, now
 
 
 def initialize(db):
+    backfill(db)
     for d in json.loads((ROOT / "config/directions.json").read_text()):
         db.execute(
             "INSERT OR IGNORE INTO directions VALUES(?,?,?,'tracking',?,?,?,'1',?)",
