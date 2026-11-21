@@ -15,10 +15,19 @@ def evolution(db, start, end, tz):
     )
     data = rows(
         db,
-        """SELECT s.id,s.dir_id,s.body,s.generated_at,r.as_of,d.title,a.verdict,a.reason
-        FROM snapshots s JOIN runs r ON r.id=s.run_id JOIN directions d ON d.id=s.dir_id
-        LEFT JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE r.as_of<=? ORDER BY r.as_of,s.generated_at,s.rowid""",
-        (str(end),),
+        """WITH prior AS (
+               SELECT s.id,row_number() OVER (
+                   PARTITION BY s.dir_id ORDER BY r.as_of DESC,s.generated_at DESC,s.rowid DESC
+               ) rank FROM snapshots s JOIN runs r ON r.id=s.run_id WHERE r.as_of < ?
+           ), selected AS (
+               SELECT id FROM prior WHERE rank=1
+               UNION ALL SELECT s.id FROM snapshots s JOIN runs r ON r.id=s.run_id WHERE r.as_of BETWEEN ? AND ?
+           )
+           SELECT s.id,s.dir_id,s.body,s.generated_at,r.as_of,d.title,a.verdict,a.reason
+           FROM selected p JOIN snapshots s ON s.id=p.id JOIN runs r ON r.id=s.run_id
+           JOIN directions d ON d.id=s.dir_id LEFT JOIN assessment_reviews a ON a.snapshot_id=s.id
+           ORDER BY r.as_of,s.generated_at,s.rowid""",
+        (str(start), str(start), str(end)),
     )
     earlier = {}
     period = {}
