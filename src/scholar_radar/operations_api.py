@@ -173,3 +173,6 @@ def edit_scope(update: ScopeUpdate):
 
     with database(write=True) as db:
         return update_scope(db, update.topics, update.arxiv_query)
+
+from .case_pages import router as research_examples_router
+router.include_router(research_examples_router)

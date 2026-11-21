@@ -258,6 +258,13 @@ async def screen(run):
 
 async def reading(run, payload):
     rid = run["id"]
+    if payload.get("focus") and payload.get("work_id"):
+        from .readings import analyze_revision
+        with database() as db:
+            work_row=db.execute("SELECT metadata FROM works WHERE id=?",(payload["work_id"],)).fetchone()
+        return await analyze_revision(payload["work_id"],payload["revision_id"],payload["focus"],rid,
+             research_question=payload.get("question"),paper=json.loads(work_row[0]),required_heading=True,
+             exact_heading=payload.get("exact_heading"))
     wk = payload["key"]
     with database() as db:
         p = json.loads(

@@ -143,14 +143,13 @@ def read_section(wid:str,focus:str,data:SectionRequest|None=None):
     if focus not in {"method","evaluation","limits"}: raise ValueError("未知章节类型")
     request=data or SectionRequest()
     with database(write=True) as db:
-        row=db.execute("""SELECT l.run_id,l.work_key,v.id revision_id,v.body FROM readings l JOIN revisions v
-            ON v.id=json_extract(l.outcome,'$.revision_id') WHERE json_extract(l.outcome,'$.work_id')=?
-            AND l.status='done' AND (? IS NULL OR v.id=?) ORDER BY v.observed_at DESC,l.rowid DESC LIMIT 1""",
-            (wid,request.revision_id,request.revision_id)).fetchone()
+        row=db.execute("""SELECT v.id revision_id,v.body FROM revisions v JOIN documents d ON d.id=v.document_id
+            WHERE d.work_id=? AND d.kind='paper' AND (? IS NULL OR v.id=?)
+            ORDER BY v.observed_at DESC,v.rowid DESC LIMIT 1""",(wid,request.revision_id,request.revision_id)).fetchone()
         if not row: raise ValueError("所选论文修订尚无可继续的精读记录")
         start,size,heading=passage(row["body"],focus,request.heading)
         if not heading: raise ValueError("已解析全文没有匹配的章节标题")
-        payload={"key":row["work_key"],"origin_run_id":row["run_id"],"focus":focus,"revision_id":row["revision_id"]}
+        payload={"work_id":wid,"focus":focus,"revision_id":row["revision_id"]}
         if request.question: payload["question"]=request.question
         if request.heading: payload["exact_heading"]=request.heading
         # Reuse a previously queued exact request, including legacy section jobs.
