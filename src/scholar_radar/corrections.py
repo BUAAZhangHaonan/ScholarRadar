@@ -10,7 +10,7 @@ from .settings import dump, now
 
 
 async def revise(run):
-    supplementation=await fill_gaps(run)
+    supplementation = await fill_gaps(run)
     with database() as db:
         profile = get_profile(db, run["profile_id"])
         rejected = rows(
@@ -21,7 +21,7 @@ async def revise(run):
             (run["id"],),
         )
         if not rejected:
-            return {"revised":0,"supplementation":supplementation}
+            return {"revised": 0, "supplementation": supplementation}
         items = []
         for i, s in enumerate(rejected, 1):
             card = json.loads(s["body"])
@@ -64,23 +64,39 @@ async def revise(run):
             h["event"] = new
         for field in ("hypothesis", "horizon", "confirm", "refute"):
             c["forecast"][field] = edit[field]
-        if isinstance(json.loads(s["body"]).get("nearest"),dict) and not isinstance(c["nearest"],dict):
-            c["nearest"]=json.loads(s["body"])["nearest"]
+        if isinstance(json.loads(s["body"]).get("nearest"), dict) and not isinstance(
+            c["nearest"], dict
+        ):
+            c["nearest"] = json.loads(s["body"])["nearest"]
         c["action"] = edit["action"]
         c["corrects"] = s["id"]
         c["previous_snapshot"] = s["id"]
         c["new_evidence_ids"] = []
         with database() as db:
-            quotes=rows(db,"""SELECT e.id,e.quote,d.work_id,w.first_seen,w.metadata FROM snapshot_evidence se JOIN evidence e ON e.id=se.evidence_id
+            quotes = rows(
+                db,
+                """SELECT e.id,e.quote,d.work_id,w.first_seen,w.metadata FROM snapshot_evidence se JOIN evidence e ON e.id=se.evidence_id
                JOIN revisions v ON v.id=e.revision_id JOIN documents d ON d.id=v.document_id LEFT JOIN works w ON w.id=d.work_id
-               WHERE se.snapshot_id=?""",(s["id"],))
-        papers={};jobs=[]
+               WHERE se.snapshot_id=?""",
+                (s["id"],),
+            )
+        papers = {}
+        jobs = []
         for q in quotes:
             if q["work_id"]:
-                meta=json.loads(q["metadata"])
-                w=papers.setdefault(q["work_id"],{"quotes":{},"date":meta.get("published_date"),"year":meta.get("year"),"first_seen":q["first_seen"]})
-                w["quotes"][q["id"]]=q["quote"]
-            else: jobs.append(q)
+                meta = json.loads(q["metadata"])
+                w = papers.setdefault(
+                    q["work_id"],
+                    {
+                        "quotes": {},
+                        "date": meta.get("published_date"),
+                        "year": meta.get("year"),
+                        "first_seen": q["first_seen"],
+                    },
+                )
+                w["quotes"][q["id"]] = q["quote"]
+            else:
+                jobs.append(q)
         eids, _ = validate_card(c, papers, jobs)
         refs = sorted(
             set(eids) | set((c.get("job_match") or {}).get("evidence_ids", []))
@@ -104,7 +120,10 @@ async def revise(run):
                     sig,
                 ),
             )
-            db.execute("INSERT OR IGNORE INTO snapshot_reading_records SELECT ?,record_id FROM snapshot_reading_records WHERE snapshot_id=?",(sid,s["id"]))
+            db.execute(
+                "INSERT OR IGNORE INTO snapshot_reading_records SELECT ?,record_id FROM snapshot_reading_records WHERE snapshot_id=?",
+                (sid, s["id"]),
+            )
             for eid in refs:
                 db.execute(
                     "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)", (sid, eid)
@@ -142,4 +161,4 @@ async def revise(run):
         from .review import review
 
         await review(run)
-    return {"revised":changed,"supplementation":supplementation}
+    return {"revised": changed, "supplementation": supplementation}

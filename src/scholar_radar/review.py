@@ -28,7 +28,8 @@ async def review(run):
                 {
                     "id": q["id"],
                     "source": q["title"] or q["kind"],
-                    "work_id":q["work_id"],"revision_id":q["revision_id"],
+                    "work_id": q["work_id"],
+                    "revision_id": q["revision_id"],
                     "quote": q["quote"],
                     "context": q["body"][max(0, q["start"] - 230) : q["end"] + 230],
                 }
@@ -42,8 +43,11 @@ async def review(run):
                     "history": b["history"],
                     "nearest": b["nearest"],
                     "hypothesis": b["forecast"],
-                    "job": b.get("job_match"),"resources":b.get("resources"),"personal_feasibility":b.get("feasibility"),
-                    "action":b.get("action"),"user_compute_conditions":profile["compute"],
+                    "job": b.get("job_match"),
+                    "resources": b.get("resources"),
+                    "personal_feasibility": b.get("feasibility"),
+                    "action": b.get("action"),
+                    "user_compute_conditions": profile["compute"],
                     "evidence": evidence,
                 }
             )
@@ -60,7 +64,6 @@ async def review(run):
         "question 写一个具体、可由材料回答的问题；anchor 逐字选一条来自目标论文的证据ID。"
         "neighbor 填需核查的真实论文题目/外部标识，尚无明确作品填空；确实无法补证填 unresolved。"
         "不要为一个清楚标明的未来验证要求预先提供其预期结果。必要条件未证实应作为开放问题保留。"
-
         "对有实质性错误的卡注明哪句话及缺少什么，不能用宽泛免责代替核对。",
         materials,
         run["id"],
@@ -86,19 +89,51 @@ async def review(run):
                     profile["strong_model"],
                 ),
             )
-            if verdict=="needs_evidence":
-                gap=v.get("gap") if isinstance(v.get("gap"),dict) else {}
-                kind=gap.get("kind")
-                if kind not in {"wording","experiment","method","conditions","neighbor"}:
-                    kind="unresolved"
-                anchor=next((e for e in item["evidence"] if e["id"]==gap.get("anchor") and e["work_id"]),None)
-                question=str(gap.get("question") or v.get("reason") or "").strip()
-                if kind not in {"wording","unresolved"} and (not anchor or not question): kind="unresolved"
-                wid=anchor["work_id"] if anchor else None; rev=anchor["revision_id"] if anchor else None
-                gid=key("review gap",card["id"],kind,question,wid,rev)
-                db.execute("INSERT OR IGNORE INTO research_gaps VALUES(?,?,?,?,?,?,?,'open',NULL,?)",
-                    (gid,card["id"],card["dir_id"],wid,rev,kind,question,
-                     dump({"anchor":gap.get("anchor"),"neighbor":gap.get("neighbor") or ""})))
+            if verdict == "needs_evidence":
+                gap = v.get("gap") if isinstance(v.get("gap"), dict) else {}
+                kind = gap.get("kind")
+                if kind not in {
+                    "wording",
+                    "experiment",
+                    "method",
+                    "conditions",
+                    "neighbor",
+                }:
+                    kind = "unresolved"
+                anchor = next(
+                    (
+                        e
+                        for e in item["evidence"]
+                        if e["id"] == gap.get("anchor") and e["work_id"]
+                    ),
+                    None,
+                )
+                question = str(gap.get("question") or v.get("reason") or "").strip()
+                if kind not in {"wording", "unresolved"} and (
+                    not anchor or not question
+                ):
+                    kind = "unresolved"
+                wid = anchor["work_id"] if anchor else None
+                rev = anchor["revision_id"] if anchor else None
+                gid = key("review gap", card["id"], kind, question, wid, rev)
+                db.execute(
+                    "INSERT OR IGNORE INTO research_gaps VALUES(?,?,?,?,?,?,?,'open',NULL,?)",
+                    (
+                        gid,
+                        card["id"],
+                        card["dir_id"],
+                        wid,
+                        rev,
+                        kind,
+                        question,
+                        dump(
+                            {
+                                "anchor": gap.get("anchor"),
+                                "neighbor": gap.get("neighbor") or "",
+                            }
+                        ),
+                    ),
+                )
     return {
         "reviewed": len(cards),
         "supported": sum(v.get("verdict") == "supported" for v in seq.values()),

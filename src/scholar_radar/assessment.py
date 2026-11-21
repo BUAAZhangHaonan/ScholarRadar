@@ -12,14 +12,15 @@ from .profile import get_profile
 from .settings import ROOT, dump, now
 
 
-def packet(db,run,direction=None,events=(),extra_works=()):
-    papers=select_papers(db,run,direction,events,extra_works)
+def packet(db, run, direction=None, events=(), extra_works=()):
+    papers = select_papers(db, run, direction, events, extra_works)
     jobs = rows(
         db,
         """SELECT e.id,e.quote,p.title,p.url,p.organization_id,o.status FROM posting_observations o JOIN postings p ON p.id=o.posting_id
         JOIN evidence e ON e.revision_id=o.revision_id WHERE o.status='advertised' AND o.verified_at<=?
         AND o.verified_at=(SELECT max(o2.verified_at) FROM posting_observations o2 WHERE o2.posting_id=p.id AND o2.verified_at<=?)
-        ORDER BY e.start LIMIT 14""", (cutoff_for(run),cutoff_for(run)),
+        ORDER BY e.start LIMIT 14""",
+        (cutoff_for(run), cutoff_for(run)),
     )
     prefs = get_profile(db, run["profile_id"])
     excluded = {
@@ -49,24 +50,29 @@ def packet(db,run,direction=None,events=(),extra_works=()):
     for r in db.execute(
         "SELECT s.dir_id,s.id,s.body,s.as_of FROM snapshots s JOIN assessment_reviews a ON a.snapshot_id=s.id WHERE a.verdict='supported' ORDER BY s.generated_at DESC"
     ):
-        if r["as_of"]<=cutoff_for(run) and r["dir_id"] not in previous:
+        if r["as_of"] <= cutoff_for(run) and r["dir_id"] not in previous:
             previous[r["dir_id"]] = {
                 "snapshot_id": r["id"],
                 "judgment": json.loads(r["body"])["judgment"],
-                "as_of":r["as_of"],"role":"当时已发表的判断",
+                "as_of": r["as_of"],
+                "role": "当时已发表的判断",
             }
     return papers, jobs, previous
 
 
 def validate_card(card, papers, jobs):
-    neighbor=card.get("nearest")
-    if isinstance(neighbor,dict):
-        if neighbor.get("work_id") not in papers or not all(isinstance(neighbor.get(k),str) and neighbor[k].strip() for k in ("title","similarity","difference")):
+    neighbor = card.get("nearest")
+    if isinstance(neighbor, dict):
+        if neighbor.get("work_id") not in papers or not all(
+            isinstance(neighbor.get(k), str) and neighbor[k].strip()
+            for k in ("title", "similarity", "difference")
+        ):
             raise ValueError("最近邻需包含可核对的作品、共同点和具体差别")
-    elif not isinstance(neighbor,str) or not neighbor.strip():
+    elif not isinstance(neighbor, str) or not neighbor.strip():
         raise ValueError("缺少最近邻材料")
-    for field in ("title","judgment","change","question","method","setting"):
-        if not isinstance(card.get(field),str) or not card[field].strip(): raise ValueError("方向卡缺少 "+field)
+    for field in ("title", "judgment", "change", "question", "method", "setting"):
+        if not isinstance(card.get(field), str) or not card[field].strip():
+            raise ValueError("方向卡缺少 " + field)
     works = list(dict.fromkeys(card.get("work_ids", [])))
     ids = list(dict.fromkeys(card.get("evidence_ids", [])))
     if not works or not set(works) <= papers.keys():
@@ -132,12 +138,10 @@ def validate_card(card, papers, jobs):
     return sorted(cited), works
 
 
-def persist_card(db,run,profile,card,ids,works,papers,sig):
+def persist_card(db, run, profile, card, ids, works, papers, sig):
     did = card.get("direction_id")
     if did == "new":
-        did = key(
-            "candidate", card["question"], card["method"], card["setting"]
-        )
+        did = key("candidate", card["question"], card["method"], card["setting"])
         db.execute(
             "INSERT OR IGNORE INTO directions VALUES(?,?,?,'candidate',?,?,?,'1',?)",
             (
@@ -150,9 +154,7 @@ def persist_card(db,run,profile,card,ids,works,papers,sig):
                 now(),
             ),
         )
-    if not db.execute(
-        "SELECT id FROM directions WHERE id=?", (did,)
-    ).fetchone():
+    if not db.execute("SELECT id FROM directions WHERE id=?", (did,)).fetchone():
         raise ValueError("未知方向")
     for wid in works:
         db.execute(
@@ -200,7 +202,10 @@ def persist_card(db,run,profile,card,ids,works,papers,sig):
     for wid in works:
         for record in papers[wid]["reading_records"]:
             if set(record["evidence_ids"]) & set(ids):
-                db.execute("INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",(sid,record["id"]))
+                db.execute(
+                    "INSERT OR IGNORE INTO snapshot_reading_records VALUES(?,?)",
+                    (sid, record["id"]),
+                )
     for eid in refs:
         db.execute(
             "INSERT OR IGNORE INTO snapshot_evidence VALUES(?,?)",
@@ -222,12 +227,8 @@ def persist_card(db,run,profile,card,ids,works,papers,sig):
             refs,
             {"scope": run["scope"], "nearest": card["nearest"]},
         )
-        db.execute(
-            "INSERT OR IGNORE INTO snapshot_claims VALUES(?,?)", (sid, cid)
-        )
-    put_values(
-        db, sid, card, refs, activity(db, did, run["scope"], run["as_of"])
-    )
+        db.execute("INSERT OR IGNORE INTO snapshot_claims VALUES(?,?)", (sid, cid))
+    put_values(db, sid, card, refs, activity(db, did, run["scope"], run["as_of"]))
     action = card["action"]
     db.execute(
         "INSERT OR IGNORE INTO actions VALUES(?,?,?,?,?,?,?)",
@@ -241,94 +242,158 @@ def persist_card(db,run,profile,card,ids,works,papers,sig):
             when,
         ),
     )
-    return sid,did
+    return sid, did
 
 
-def unassigned_targets(db,events,directions,run):
-    targeted={}
+def unassigned_targets(db, events, directions, run):
+    targeted = {}
     for e in events:
         if e["direction_id"]:
-            targeted.setdefault(e["direction_id"],[]).append(e)
+            targeted.setdefault(e["direction_id"], []).append(e)
             continue
-        if e["kind"]!="reading": continue
-        wid=e["entity_id"]
-        linked=changes.work_directions(db,wid)
+        if e["kind"] != "reading":
+            continue
+        wid = e["entity_id"]
+        linked = changes.work_directions(db, wid)
         if not linked:
-            note=db.execute("""SELECT w.title,r.topic,c.statement FROM reading_records r JOIN works w ON w.id=r.work_id
-                             JOIN claims c ON c.id=r.id WHERE r.work_id=? AND r.recorded_at<=? ORDER BY r.recorded_at DESC LIMIT 1""",(wid,cutoff_for(run))).fetchone()
+            note = db.execute(
+                """SELECT w.title,r.topic,c.statement FROM reading_records r JOIN works w ON w.id=r.work_id
+                             JOIN claims c ON c.id=r.id WHERE r.work_id=? AND r.recorded_at<=? ORDER BY r.recorded_at DESC LIMIT 1""",
+                (wid, cutoff_for(run)),
+            ).fetchone()
             if note:
-                words,han=terms(" ".join(note))
-                matches=[]
+                words, han = terms(" ".join(note))
+                matches = []
                 for d in directions:
-                    dw,dh=terms(" ".join(d[k] for k in ("title","question","method","setting")))
-                    similarities=len(dw&words)+len(dh&han)
-                    if similarities: matches.append((similarities,d["id"]))
+                    dw, dh = terms(
+                        " ".join(
+                            d[k] for k in ("title", "question", "method", "setting")
+                        )
+                    )
+                    similarities = len(dw & words) + len(dh & han)
+                    if similarities:
+                        matches.append((similarities, d["id"]))
                 if matches:
-                    best=max(x[0] for x in matches)
-                    linked={did for score,did in matches if score==best}
-        for did in linked or {None}: targeted.setdefault(did,[]).append(e)
+                    best = max(x[0] for x in matches)
+                    linked = {did for score, did in matches if score == best}
+        for did in linked or {None}:
+            targeted.setdefault(did, []).append(e)
     return targeted
 
 
-async def assess(run,direction_ids=None):
+async def assess(run, direction_ids=None):
     with database() as db:
-        profile=get_profile(db,run["profile_id"])
-        directions=rows(db,"SELECT id,title,question,method,setting,layer,definition_version FROM directions WHERE status!='merged'")
-        events=changes.pending(db,direction_ids)
-        grouped=unassigned_targets(db,events,directions,run)
+        profile = get_profile(db, run["profile_id"])
+        directions = rows(
+            db,
+            "SELECT id,title,question,method,setting,layer,definition_version FROM directions WHERE status!='merged'",
+        )
+        events = changes.pending(db, direction_ids)
+        grouped = unassigned_targets(db, events, directions, run)
         if direction_ids is not None:
-            for did in direction_ids: grouped.setdefault(did,[])
-    if not grouped: return {"snapshots":[],"reason":"没有与研究方向有关的新输入"}
-    catalog={d["id"]:d for d in directions}
-    instruction=(ROOT/"prompts/direction-assessment.txt").read_text()
-    saved=[]; rejected=[];handled=[]
-    for target,trigger in grouped.items():
-        direction=catalog.get(target)
+            for did in direction_ids:
+                grouped.setdefault(did, [])
+    if not grouped:
+        return {"snapshots": [], "reason": "没有与研究方向有关的新输入"}
+    catalog = {d["id"]: d for d in directions}
+    instruction = (ROOT / "prompts/direction-assessment.txt").read_text()
+    saved = []
+    rejected = []
+    handled = []
+    for target, trigger in grouped.items():
+        direction = catalog.get(target)
         with database() as db:
-            papers,jobs,previous=packet(db,run,direction,trigger)
-            versions=changes.input_versions(db,target) if target else []
-            results=changes.research_outcomes(db,target) if target else []
-            sig=signature(direction,profile["id"],run["scope"],papers,jobs,versions,results)
-            done=db.execute("SELECT 1 FROM direction_assessment_inputs WHERE direction_id=? AND profile_id=? AND signature=?",
-                            (target,profile["id"],sig)).fetchone() if target else None
-        if not papers or done or (not target and len(papers)<2):
-            handled.extend(e["id"] for e in trigger); continue
-        paper_input,job_input,restore_ids=label_inputs(papers,jobs)
-        old=(previous.get(target) if target else None)
-        inputs={"papers":paper_input,"jobs":job_input,"direction":direction,"previous":old,
-                "change_types":sorted({e["kind"] for e in trigger}),"recorded_user_outcomes":results,
-                "as_of":run["as_of"],"assets":profile["assets"],"compute":profile["compute"],
-                "goals":profile["goals"],"weeks":profile["validation_weeks"]}
-        data=await ask("synthesis",profile["strong_model"],instruction,inputs,run["id"],max_tokens=6500)
-        candidates=data.get("cards")
-        if not isinstance(candidates,list): raise ValueError("方向评估未返回有效列表")
-        errors=[]
+            papers, jobs, previous = packet(db, run, direction, trigger)
+            versions = changes.input_versions(db, target) if target else []
+            results = changes.research_outcomes(db, target) if target else []
+            sig = signature(
+                direction, profile["id"], run["scope"], papers, jobs, versions, results
+            )
+            done = (
+                db.execute(
+                    "SELECT 1 FROM direction_assessment_inputs WHERE direction_id=? AND profile_id=? AND signature=?",
+                    (target, profile["id"], sig),
+                ).fetchone()
+                if target
+                else None
+            )
+        if not papers or done or (not target and len(papers) < 2):
+            handled.extend(e["id"] for e in trigger)
+            continue
+        paper_input, job_input, restore_ids = label_inputs(papers, jobs)
+        old = previous.get(target) if target else None
+        inputs = {
+            "papers": paper_input,
+            "jobs": job_input,
+            "direction": direction,
+            "previous": old,
+            "change_types": sorted({e["kind"] for e in trigger}),
+            "recorded_user_outcomes": results,
+            "as_of": run["as_of"],
+            "assets": profile["assets"],
+            "compute": profile["compute"],
+            "goals": profile["goals"],
+            "weeks": profile["validation_weeks"],
+        }
+        data = await ask(
+            "synthesis",
+            profile["strong_model"],
+            instruction,
+            inputs,
+            run["id"],
+            max_tokens=6500,
+        )
+        candidates = data.get("cards")
+        if not isinstance(candidates, list):
+            raise ValueError("方向评估未返回有效列表")
+        errors = []
         with database(write=True) as db:
             for raw in candidates[:1]:
-                card=restore_ids(raw)
+                card = restore_ids(raw)
                 db.execute("SAVEPOINT proposed_card")
                 try:
-                    if card.get("direction_id")!=(target or "new"): raise ValueError("方向卡超出本次评估对象")
-                    nearest=card.get("nearest")
-                    if isinstance(nearest,list) and nearest and all(isinstance(n,dict) and n.get("work_id") in papers
-                            and all(isinstance(n.get(k),str) and n[k].strip() for k in ("title","similarity","difference")) for n in nearest):
-                        card["nearest_works"]=nearest
-                        card["nearest"]=nearest[0]
-                    if not isinstance(card.get("nearest"),dict): raise ValueError("新增方向卡需要结构化的最近邻比较")
-                    ids,works=validate_card(card,papers,jobs)
-                    sid,did=persist_card(db,run,profile,card,ids,works,papers,sig)
+                    if card.get("direction_id") != (target or "new"):
+                        raise ValueError("方向卡超出本次评估对象")
+                    nearest = card.get("nearest")
+                    if (
+                        isinstance(nearest, list)
+                        and nearest
+                        and all(
+                            isinstance(n, dict)
+                            and n.get("work_id") in papers
+                            and all(
+                                isinstance(n.get(k), str) and n[k].strip()
+                                for k in ("title", "similarity", "difference")
+                            )
+                            for n in nearest
+                        )
+                    ):
+                        card["nearest_works"] = nearest
+                        card["nearest"] = nearest[0]
+                    if not isinstance(card.get("nearest"), dict):
+                        raise ValueError("新增方向卡需要结构化的最近邻比较")
+                    ids, works = validate_card(card, papers, jobs)
+                    sid, did = persist_card(
+                        db, run, profile, card, ids, works, papers, sig
+                    )
                     db.execute("RELEASE proposed_card")
                     saved.append(sid)
-                except (ValueError,KeyError,TypeError) as exc:
+                except (ValueError, KeyError, TypeError) as exc:
                     db.execute("ROLLBACK TO proposed_card")
                     db.execute("RELEASE proposed_card")
                     errors.append(str(exc))
             if not errors and target:
-                db.execute("INSERT OR IGNORE INTO direction_assessment_inputs VALUES(?,?,?,?,?)",
-                     (target,profile["id"],sig,run["id"],now()))
-        if errors: rejected.extend(errors)
-        else: handled.extend(e["id"] for e in trigger)
+                db.execute(
+                    "INSERT OR IGNORE INTO direction_assessment_inputs VALUES(?,?,?,?,?)",
+                    (target, profile["id"], sig, run["id"], now()),
+                )
+        if errors:
+            rejected.extend(errors)
+        else:
+            handled.extend(e["id"] for e in trigger)
     if not rejected:
-        with database(write=True) as db: changes.consume(db,set(handled))
-    if rejected: raise ValueError("方向卡校验失败："+" / ".join(rejected))
-    return {"snapshots":saved,"processed_changes":list(dict.fromkeys(handled))}
+        with database(write=True) as db:
+            changes.consume(db, set(handled))
+    if rejected:
+        raise ValueError("方向卡校验失败：" + " / ".join(rejected))
+    return {"snapshots": saved, "processed_changes": list(dict.fromkeys(handled))}

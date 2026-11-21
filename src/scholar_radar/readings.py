@@ -23,92 +23,232 @@ HEADINGS = {
 
 def passage(body, focus):
     """Select the named section through its next peer, capped at the service limit."""
-    pattern=HEADINGS.get(focus)
-    headings=list(re.finditer(r"(?m)^(#{1,6})[ \t]+(.{1,160})$",body))
+    pattern = HEADINGS.get(focus)
+    headings = list(re.finditer(r"(?m)^(#{1,6})[ \t]+(.{1,160})$", body))
     if pattern:
-        for i,h in enumerate(headings):
-            if re.search(pattern,h[2],re.I):
-                end=next((n.start() for n in headings[i+1:] if len(n[1])<=len(h[1])),len(body))
+        for i, h in enumerate(headings):
+            if re.search(pattern, h[2], re.I):
+                end = next(
+                    (n.start() for n in headings[i + 1 :] if len(n[1]) <= len(h[1])),
+                    len(body),
+                )
                 # Some parsers emit numbered subsections at the same Markdown level.
-                section=re.match(r"(?:section\s+)?(\d+)\b",h[2],re.I)
+                section = re.match(r"(?:section\s+)?(\d+)\b", h[2], re.I)
                 if section:
-                    end=next((n.start() for n in headings[i+1:] if len(n[1])<=len(h[1])
-                        and not re.match(r"^"+section[1]+r"\.\d",n[2])),len(body))
-                return h.start(),min(64000,end-h.start()),h[2]
-    intro=next((h for h in headings if re.search(r"\babstract\b|摘要",h[2],re.I)),None)
-    start=intro.start() if intro else 0
-    end=next((h.start() for h in headings if h.start()>start and re.search(r"related work|method|preliminar|相关工作|方法",h[2],re.I)),len(body))
-    return start,min(64000,end-start),None
+                    end = next(
+                        (
+                            n.start()
+                            for n in headings[i + 1 :]
+                            if len(n[1]) <= len(h[1])
+                            and not re.match(r"^" + section[1] + r"\.\d", n[2])
+                        ),
+                        len(body),
+                    )
+                return h.start(), min(64000, end - h.start()), h[2]
+    intro = next(
+        (h for h in headings if re.search(r"\babstract\b|摘要", h[2], re.I)), None
+    )
+    start = intro.start() if intro else 0
+    end = next(
+        (
+            h.start()
+            for h in headings
+            if h.start() > start
+            and re.search(r"related work|method|preliminar|相关工作|方法", h[2], re.I)
+        ),
+        len(body),
+    )
+    return start, min(64000, end - start), None
 
 
 def outcome(record):
-    return {"work_id":record["work_id"],"revision_id":record["revision_id"],"claim_id":record["id"],
-            "record_id":record["id"],"analysis_id":record["analysis_id"],"version":record["version"],
-            "evidence_ids":record["evidence_ids"],"coverage":record["coverage"]}
+    return {
+        "work_id": record["work_id"],
+        "revision_id": record["revision_id"],
+        "claim_id": record["id"],
+        "record_id": record["id"],
+        "analysis_id": record["analysis_id"],
+        "version": record["version"],
+        "evidence_ids": record["evidence_ids"],
+        "coverage": record["coverage"],
+    }
 
 
-async def analyze_revision(wid,rid,focus,run_id,*,research_question=None,paper=None,required_heading=False):
-    context=paper or {}
-    focus=focus or "overview"
+async def analyze_revision(
+    wid,
+    rid,
+    focus,
+    run_id,
+    *,
+    research_question=None,
+    paper=None,
+    required_heading=False,
+):
+    context = paper or {}
+    focus = focus or "overview"
     with database() as db:
-        rev=db.execute("""SELECT v.*,c.file FROM revisions v JOIN documents d ON d.id=v.document_id
-             LEFT JOIN calls c ON c.id=v.source_call WHERE v.id=? AND d.work_id=? AND d.kind='paper'""",(rid,wid)).fetchone()
-        if not rev: raise ValueError("缺少指定论文修订")
-        existing=work_records(db,wid,rid)
-    offset,size,heading=passage(rev["body"],focus)
-    if required_heading and not heading: raise ValueError("当前固定修订没有匹配的章节标题")
-    question=QUESTION
-    if heading: question+=f"\n本次核对实际章节《{heading}》。"
-    if research_question: question+="\n本次待澄清的问题："+research_question
+        rev = db.execute(
+            """SELECT v.*,c.file FROM revisions v JOIN documents d ON d.id=v.document_id
+             LEFT JOIN calls c ON c.id=v.source_call WHERE v.id=? AND d.work_id=? AND d.kind='paper'""",
+            (rid, wid),
+        ).fetchone()
+        if not rev:
+            raise ValueError("缺少指定论文修订")
+        existing = work_records(db, wid, rid)
+    offset, size, heading = passage(rev["body"], focus)
+    if required_heading and not heading:
+        raise ValueError("当前固定修订没有匹配的章节标题")
+    question = QUESTION
+    if heading:
+        question += f"\n本次核对实际章节《{heading}》。"
+    if research_question:
+        question += "\n本次待澄清的问题：" + research_question
     for record in existing:
-        if required_heading and not (record["coverage"]["start"]<=offset and record["coverage"]["end"]>=offset+size):
+        if required_heading and not (
+            record["coverage"]["start"] <= offset
+            and record["coverage"]["end"] >= offset + size
+        ):
             continue
-        if record["focus"]==focus and (record["question"]==question or
-              (not research_question and not record["sections"] and record["question"].startswith(("论文用什么方法","请核对当前原文章节")))):
+        if record["focus"] == focus and (
+            record["question"] == question
+            or (
+                not research_question
+                and not record["sections"]
+                and record["question"].startswith(
+                    ("论文用什么方法", "请核对当前原文章节")
+                )
+            )
+        ):
             if run_id:
-                with database(write=True) as db: db.execute("INSERT OR IGNORE INTO reading_record_runs VALUES(?,?)",(record["id"],run_id))
+                with database(write=True) as db:
+                    db.execute(
+                        "INSERT OR IGNORE INTO reading_record_runs VALUES(?,?)",
+                        (record["id"], run_id),
+                    )
             return outcome(record)
-    if not rev["file"]: raise ValueError("固定版本缺少原始读取收据")
-    original=json.loads(Path(rev["file"]).read_text())
-    if original["document_revision"]!=rev["upstream_revision"]: raise ValueError("原始读取收据与修订不一致")
-    args={"document_id":original["document_id"],"question":question,"language":"zh","offset":offset,"limit_chars":size}
-    identity=["record-v3",rid,rev["mode"],focus]
-    result=await invoke("analysis","analyze_paper",args,identity=identity,id_field="analysis_id",run_id=run_id)
-    if result.get("document_revision")!=rev["upstream_revision"] or result.get("document_id")!=args["document_id"]:
+    if not rev["file"]:
+        raise ValueError("固定版本缺少原始读取收据")
+    original = json.loads(Path(rev["file"]).read_text())
+    if original["document_revision"] != rev["upstream_revision"]:
+        raise ValueError("原始读取收据与修订不一致")
+    args = {
+        "document_id": original["document_id"],
+        "question": question,
+        "language": "zh",
+        "offset": offset,
+        "limit_chars": size,
+    }
+    identity = ["record-v3", rid, rev["mode"], focus]
+    result = await invoke(
+        "analysis",
+        "analyze_paper",
+        args,
+        identity=identity,
+        id_field="analysis_id",
+        run_id=run_id,
+    )
+    if (
+        result.get("document_revision") != rev["upstream_revision"]
+        or result.get("document_id") != args["document_id"]
+    ):
         raise ValueError("分析结果引用了另一份修订")
-    analysis=result["analysis"]; cov=analysis.get("coverage") or {}
-    start,end=cov.get("start"),cov.get("end")
-    if not isinstance(start,int) or not isinstance(end,int) or not offset<=start<end<=offset+size:
+    analysis = result["analysis"]
+    cov = analysis.get("coverage") or {}
+    start, end = cov.get("start"), cov.get("end")
+    if (
+        not isinstance(start, int)
+        or not isinstance(end, int)
+        or not offset <= start < end <= offset + size
+    ):
         raise ValueError("分析缺少在请求区间内可核对的实际覆盖")
     with database(write=True) as db:
-        eids=[]
-        for item in analysis.get("evidence",[]):
-            loc=next(iter(item.get("locations") or []),None)
+        eids = []
+        for item in analysis.get("evidence", []):
+            loc = next(iter(item.get("locations") or []), None)
             if loc:
-                eids.append(span(db,rid,loc["start"],loc["end"],item["quote"]))
-        if not eids: raise ValueError("精读结果没有可定位的支持证据")
-        remote=result.get("analysis_id"); call_id=key("analysis","analyze_paper",identity,args)
-        if remote!="radar-"+call_id: raise ValueError("分析服务返回的持久身份与原请求不符")
-        cid=claim(db,"system_inference",analysis["answer"],eids,eids,
-                  {"record_type":"paper_analysis","analysis_id":remote,"question":question,"coverage":cov,"model":analysis.get("model_used"),"revision":rid})
+                eids.append(span(db, rid, loc["start"], loc["end"], item["quote"]))
+        if not eids:
+            raise ValueError("精读结果没有可定位的支持证据")
+        remote = result.get("analysis_id")
+        call_id = key("analysis", "analyze_paper", identity, args)
+        if remote != "radar-" + call_id:
+            raise ValueError("分析服务返回的持久身份与原请求不符")
+        cid = claim(
+            db,
+            "system_inference",
+            analysis["answer"],
+            eids,
+            eids,
+            {
+                "record_type": "paper_analysis",
+                "analysis_id": remote,
+                "question": question,
+                "coverage": cov,
+                "model": analysis.get("model_used"),
+                "revision": rid,
+            },
+        )
         for eid in eids:
-            quote=db.execute("SELECT quote FROM evidence WHERE id=?",(eid,)).fetchone()[0]
-            claim(db,"source_fact",quote,[eid],eids)
-        created=save_record(db,wid=wid,rid=rid,cid=cid,analysis_id=remote,call_id=call_id,run_id=run_id,question=question,
-             focus=focus,heading=heading,start=start,end=end,topic=context.get("theme_hint"),direction_ids=context.get("direction_ids") or [])
+            quote = db.execute(
+                "SELECT quote FROM evidence WHERE id=?", (eid,)
+            ).fetchone()[0]
+            claim(db, "source_fact", quote, [eid], eids)
+        created = save_record(
+            db,
+            wid=wid,
+            rid=rid,
+            cid=cid,
+            analysis_id=remote,
+            call_id=call_id,
+            run_id=run_id,
+            question=question,
+            focus=focus,
+            heading=heading,
+            start=start,
+            end=end,
+            topic=context.get("theme_hint"),
+            direction_ids=context.get("direction_ids") or [],
+        )
         if created:
             from .changes import invalidate
-            explicit=[r[0] for r in db.execute("SELECT direction_id FROM reading_record_directions WHERE record_id=?",(cid,))]
-            invalidate(db,"reading",wid,cid,explicit or None)
-        db.execute("INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?,?,?,?,?)",
-             (key(wid,"reading",rid),wid,"document_read",rev["version"],None,None,None,now(),now(),original.get("source",{}).get("original_url") or ""))
-        return outcome(next(r for r in work_records(db,wid,rid) if r["id"]==cid))
+
+            explicit = [
+                r[0]
+                for r in db.execute(
+                    "SELECT direction_id FROM reading_record_directions WHERE record_id=?",
+                    (cid,),
+                )
+            ]
+            invalidate(db, "reading", wid, cid, explicit or None)
+        db.execute(
+            "INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?,?,?,?,?)",
+            (
+                key(wid, "reading", rid),
+                wid,
+                "document_read",
+                rev["version"],
+                None,
+                None,
+                None,
+                now(),
+                now(),
+                original.get("source", {}).get("original_url") or "",
+            ),
+        )
+        return outcome(next(r for r in work_records(db, wid, rid) if r["id"] == cid))
 
 
 async def read_paper(paper, run_id=None):
     if paper.get("target_revision_id") and paper.get("work_id"):
-        return await analyze_revision(paper["work_id"],paper["target_revision_id"],paper.get("evidence_focus"),run_id,
-             research_question=paper.get("analysis_question"),paper=paper,required_heading=True)
+        return await analyze_revision(
+            paper["work_id"],
+            paper["target_revision_id"],
+            paper.get("evidence_focus"),
+            run_id,
+            research_question=paper.get("analysis_question"),
+            paper=paper,
+            required_heading=True,
+        )
     aid, ver = arxiv_id(
         paper.get("arxiv_id")
         or str(paper.get("doi", "")).lower().removeprefix("10.48550/arxiv.")
@@ -165,7 +305,11 @@ async def read_paper(paper, run_id=None):
     url = (
         ("https://arxiv.org/abs/" + base)
         if base
-        else (first.get("source", {}).get("original_url") or paper.get("pdf_url") or "https://doi.org/" + query)
+        else (
+            first.get("source", {}).get("original_url")
+            or paper.get("pdf_url")
+            or "https://doi.org/" + query
+        )
     )
     with database(write=True) as db:
         wid = work(db, paper["title"], ids, paper)
@@ -196,4 +340,11 @@ async def read_paper(paper, run_id=None):
                 "official_link_candidate",
                 "mentioned_in_document",
             )
-    return await analyze_revision(wid,rid,paper.get("evidence_focus"),run_id,research_question=paper.get("analysis_question"),paper=paper)
+    return await analyze_revision(
+        wid,
+        rid,
+        paper.get("evidence_focus"),
+        run_id,
+        research_question=paper.get("analysis_question"),
+        paper=paper,
+    )
