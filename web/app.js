@@ -3,7 +3,8 @@ const routes = {
   "/": "daily",
   "/directions": "directions",
   "/library": "library",
-  "/actions": "actions",
+  "/actions": "tasks",
+  "/tasks": "tasks",
   "/settings": "settings",
 };
 for (const nav of document.querySelectorAll("nav a"))
@@ -17,7 +18,7 @@ document.addEventListener("click", (e) => {
 });
 try {
   const page = await import(
-    "./" + (routes[location.pathname] || (location.pathname.startsWith("/directions/")?"directions":location.pathname.startsWith("/works/")?"library":"daily")) + ".js"
+    "./" + (routes[location.pathname] || (location.pathname.startsWith("/directions/")?"directions":location.pathname.startsWith("/works/")?"library":location.pathname.startsWith("/tasks/")?"tasks":"daily")) + ".js"
   );
   await page.render();
 } catch (err) {

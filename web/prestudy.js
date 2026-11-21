@@ -7,8 +7,8 @@ export const isActive = task => activeStates.has(task.status) || activeStates.ha
 const decisionNames={discuss:"值得进一步讨论",lead:"保留研究线索",drop:"暂不建议继续"};
 export function stageStatus(task){
   if(isActive(task))return task.status==="queued"?"已加入研究任务":"正在查阅";
-  if(["failed","error","interrupted","unknown_outcome","needs_attention","blocked"].includes(task.status)||
-     ["failed","error","interrupted","unknown_outcome","needs_attention","blocked"].includes(task.execution_status)) return "需要处理";
+  if(["failed","error","interrupted","unknown_outcome","connection_unknown","paused_external","needs_attention","blocked"].includes(task.status)||
+     ["failed","error","interrupted","unknown_outcome","connection_unknown","paused_external","needs_attention","blocked"].includes(task.execution_status)) return "需要处理";
   if(task.evidence_limited)return "现有材料受限";
   return decisionNames[task.research_decision]||"已有结果";
 }
@@ -46,6 +46,7 @@ function originalText(value,sources){
   return node.innerHTML;
 }
 function draftBody(task){
+  if(task.draft_text)return task.draft_text;
   if(typeof task.draft==="string")return task.draft;
   const draft=task.draft||{};
   return [draft.current_understanding,draft.text,draft.overview,draft.decision_reason].filter(x=>typeof x==="string").join("\n\n")||task.current_understanding||"";
@@ -101,14 +102,14 @@ export async function attachPrestudy(root, direction, snapshot) {
     }
     root.querySelectorAll("[data-stage]").forEach(b=>b.onclick=()=>{
       const stage=b.dataset.stage, seen=new Map();
-      for(const t of existing){if(t.idea_id&&!seen.has(t.idea_id))seen.set(t.idea_id,t)}
+      for(const t of existing){if(t.status==="completed"&&t.idea_id&&!seen.has(t.idea_id))seen.set(t.idea_id,t)}
       const options=[...seen].map(([id,t])=>'<option value="'+esc(id)+'">'+esc(t.focus||t.direction_title||stageName(t.stage))+'</option>').join("");
       const entry=$("[data-entry]",root);
       entry.innerHTML='<form class="form research-form"><h3>'+stageName(stage)+'</h3>'+
         (options?'<label>沿用的研究想法<select name="idea">'+(stage==="develop"?'<option value="">从当前方向新建切口</option>':'')+options+'</select></label>':"")+
-        '<label>想进一步查清的问题<textarea name="focus" maxlength="2000" placeholder="'+(stage==="develop"?"例如，哪项对照能区分两种解释？":"例如，已有工作是否已经回答了这个问题？")+'"></textarea></label>'+
+        '<label>想进一步查清的问题<textarea name="focus" required maxlength="2000" placeholder="'+(stage==="develop"?"例如，哪项对照能区分两种解释？":"例如，已有工作是否已经回答了这个问题？")+'"></textarea></label>'+
         '<div class="buttons"><button type="submit">开始预研</button><button type="button" class="quiet" data-cancel>取消</button></div></form>';
-      const form=$("form",entry);form.elements.focus.focus();
+      const form=$("form",entry);form.elements.focus.value=stage==="run"?(existing.find(t=>t.next_question)?.next_question||direction.question):direction.question;form.elements.focus.focus();
       $("[data-cancel]",form).onclick=()=>{entry.replaceChildren();b.focus()};
       form.onsubmit=async ev=>{
         ev.preventDefault();const values=new FormData(form),focus=String(values.get("focus")||"").trim(),idea=values.get("idea")||null;
