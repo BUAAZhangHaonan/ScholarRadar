@@ -242,7 +242,9 @@ export function presentation(task, { showFocus = true } = {}) {
   const raw = polished
     ? once(p.stage_summary) + once(p.overview) + candidates
     : draftBody(task)
-      ? "<h3>研究原稿</h3>" + once(draftBody(task))
+      ? (task.polish_failure
+          ? '<p class="sub">研究阶段已完成，中文成文未完成。</p>'
+          : "") + "<h3>研究原稿</h3>" + once(draftBody(task))
       : "";
   return (
     '<div class="stage-result">' +
@@ -253,7 +255,7 @@ export function presentation(task, { showFocus = true } = {}) {
       prose(
         isActive(task)
           ? "研究结果准备好后会出现在这里。"
-          : task.error_message || "本阶段还没有可阅读的正文。",
+          : task.error || "本阶段还没有可阅读的正文。",
       )) +
     (p.technical_analysis
       ? "<details><summary>技术分析</summary>" +
