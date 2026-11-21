@@ -18,9 +18,9 @@ class Decision(BaseModel):
 
 
 class Feedback(BaseModel):
-    recommendation_id: str|None=None
-    snapshot_id: str|None=None
-    action_id: str|None=None
+    recommendation_id: str | None = None
+    snapshot_id: str | None = None
+    action_id: str | None = None
     entity_type: str
     entity_id: str
     dimension: str
@@ -103,7 +103,10 @@ def shadow_results():
     with database() as db:
         return rows(db, "SELECT * FROM shadow_choices ORDER BY computed_at DESC")
 
+
 @router.get("/api/comparisons/{evaluation_id}")
-def comparison_results(evaluation_id:str):
+def comparison_results(evaluation_id: str):
     from .recommendations import compare
-    with database() as db: return compare(db,evaluation_id)
+
+    with database() as db:
+        return compare(db, evaluation_id)

@@ -17,7 +17,8 @@ def measure(db, rule, wid, cutoff):
             "SELECT EXISTS(SELECT 1 FROM factor_input_times WHERE kind='resource' AND entity=? AND at<=?)",
             (wid, cutoff),
         ).fetchone()[0]
-    if rule!="same_direction_work_count": raise ValueError("没有可执行的因子定义")
+    if rule != "same_direction_work_count":
+        raise ValueError("没有可执行的因子定义")
     return db.execute(
         """SELECT count(DISTINCT m2.work_id) FROM memberships m JOIN memberships m2 ON m.direction_id=m2.direction_id
           WHERE m.work_id=? AND m2.work_id!=m.work_id AND m.created_at<=? AND m2.created_at<=?""",
@@ -73,7 +74,7 @@ def refresh(db, run_id=None):
                     evaluation["id"],
                     dump(ranked[: len(baseline)]),
                     now(),
-                    "pending" if len(set(score.values()))>1 else "non_discriminating",
+                    "pending" if len(set(score.values())) > 1 else "non_discriminating",
                     str(due),
                 ),
             )

@@ -8,7 +8,7 @@ STATES = {
     "active": {"complete": "completed", "defer": "deferred"},
 }
 VALUES = {
-    "follow": {"followed","unfollowed"},
+    "follow": {"followed", "unfollowed"},
     "reading_status": {"unread", "read", "known"},
     "reading_value": {"useful", "average", "irrelevant"},
     "career_value": {"verified", "helpful", "artifact", "irrelevant"},
@@ -48,15 +48,31 @@ def decision(db, aid, choice, reason, actual, request_id):
         (eid, aid, row["status"], new, reason, dump(actual), now()),
     )
     from .recommendations import link_outcome
-    link_outcome(db,eid,aid)
-    if new=="completed" and actual:
+
+    link_outcome(db, eid, aid)
+    if new == "completed" and actual:
         from .changes import invalidate
-        target=db.execute("SELECT s.dir_id FROM snapshots s JOIN actions a ON a.snapshot_id=s.id WHERE a.id=?",(aid,)).fetchone()
-        invalidate(db,"experiment",target[0],eid)
+
+        target = db.execute(
+            "SELECT s.dir_id FROM snapshots s JOIN actions a ON a.snapshot_id=s.id WHERE a.id=?",
+            (aid,),
+        ).fetchone()
+        invalidate(db, "experiment", target[0], eid)
     return {"id": aid, "status": new}
 
 
-def feedback(db,entity_type,entity_id,dimension,value,reason,request_id,recommendation_id=None,snapshot_id=None,action_id=None):
+def feedback(
+    db,
+    entity_type,
+    entity_id,
+    dimension,
+    value,
+    reason,
+    request_id,
+    recommendation_id=None,
+    snapshot_id=None,
+    action_id=None,
+):
     table = TARGETS.get(entity_type)
     if (
         not table
@@ -65,7 +81,8 @@ def feedback(db,entity_type,entity_id,dimension,value,reason,request_id,recommen
         ).fetchone()
     ):
         raise ValueError("反馈对象不存在")
-    if dimension=="follow" and entity_type!="direction": raise ValueError("仅研究方向可以加入关注")
+    if dimension == "follow" and entity_type != "direction":
+        raise ValueError("仅研究方向可以加入关注")
     if value not in VALUES.get(dimension, set()):
         raise ValueError("反馈选项无效")
     fid = key("feedback", entity_type, entity_id, request_id)
@@ -74,7 +91,8 @@ def feedback(db,entity_type,entity_id,dimension,value,reason,request_id,recommen
         (fid, entity_type, entity_id, dimension, value, reason, now()),
     )
     from .recommendations import bind
-    bind(db,fid,entity_type,entity_id,recommendation_id,snapshot_id,action_id)
+
+    bind(db, fid, entity_type, entity_id, recommendation_id, snapshot_id, action_id)
     return {"id": fid}
 
 

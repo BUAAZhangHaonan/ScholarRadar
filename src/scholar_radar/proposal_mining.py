@@ -14,9 +14,14 @@ async def mine(run):
             ).fetchone()[0]
             or ""
         )
-        from .recommendations import signals,outcome_examples
-        feedback=[f for f in signals(db,limit=30) if f["created_at"]>earlier and f["reason"]]
-        actions=outcome_examples(db,earlier)
+        from .recommendations import signals, outcome_examples
+
+        feedback = [
+            f
+            for f in signals(db, limit=30)
+            if f["created_at"] > earlier and f["reason"]
+        ]
+        actions = outcome_examples(db, earlier)
         existing = [
             json.loads(r[0]) for r in db.execute("SELECT definition FROM proposals")
         ]
