@@ -21,40 +21,87 @@ HEADINGS = {
 }
 
 
-def passage(body, focus):
-    """Select the named section through its next peer, capped at the service limit."""
-    pattern = HEADINGS.get(focus)
-    headings = list(re.finditer(r"(?m)^(#{1,6})[ \t]+(.{1,160})$", body))
-    if pattern:
-        for i, h in enumerate(headings):
-            if re.search(pattern, h[2], re.I):
-                end = next(
-                    (n.start() for n in headings[i + 1 :] if len(n[1]) <= len(h[1])),
-                    len(body),
+def section_catalog(body):
+    """Actual Markdown headings and Unicode ranges in this fixed parse."""
+    catalog = []
+    stack = []
+    fence = None
+    pos = 0
+    for line in body.splitlines(keepends=True):
+        raw = line.rstrip("\r\n")
+        delimiter = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", raw)
+        if delimiter and (
+            fence is None
+            or (
+                delimiter[1][0] == fence[0]
+                and len(delimiter[1]) >= len(fence)
+                and not delimiter[2].strip()
+            )
+        ):
+            fence = delimiter[1] if fence is None else None
+        elif fence is None:
+            h = re.match(r"^ {0,3}(#{1,6})[ \t]+(.+)$", raw)
+            if h:
+                title = re.sub(r"[ \t]+#+[ \t]*$", "", h[2]).strip()
+                level = len(h[1])
+                num = re.match(
+                    r"^(?:section\s+)?(\d+(?:\.\d+)*)(?:[.)])?\s", title, re.I
                 )
-                # Some parsers emit numbered subsections at the same Markdown level.
-                section = re.match(r"(?:section\s+)?(\d+)\b", h[2], re.I)
-                if section:
-                    end = next(
-                        (
-                            n.start()
-                            for n in headings[i + 1 :]
-                            if len(n[1]) <= len(h[1])
-                            and not re.match(r"^" + section[1] + r"\.\d", n[2])
-                        ),
-                        len(body),
-                    )
-                return h.start(), min(64000, end - h.start()), h[2]
+                number = num[1] if num else None
+                while stack:
+                    parent, ancestor = stack[-1]
+                    if ancestor and number:
+                        child = number.startswith(ancestor + ".")
+                    else:
+                        child = level > parent["level"]
+                    if child:
+                        break
+                    parent["end"] = pos
+                    stack.pop()
+                entry = {
+                    "heading": title,
+                    "start": pos,
+                    "end": len(body),
+                    "level": level,
+                }
+                catalog.append(entry)
+                stack.append((entry, number))
+        pos += len(line)
+    return catalog
+
+
+def passage(body, focus, exact_heading=None):
+    """An explicit heading must match once; only a generic focus uses patterns."""
+    entries = section_catalog(body)
+    selected = None
+    if exact_heading is not None:
+        matches = [h for h in entries if h["heading"] == exact_heading]
+        if len(matches) != 1:
+            raise ValueError("该修订中找不到指定的唯一章节标题")
+        selected = matches[0]
+    elif pattern := HEADINGS.get(focus):
+        selected = next(
+            (h for h in entries if re.search(pattern, h["heading"], re.I)), None
+        )
+    if selected:
+        return (
+            selected["start"],
+            min(64000, selected["end"] - selected["start"]),
+            selected["heading"],
+        )
     intro = next(
-        (h for h in headings if re.search(r"\babstract\b|摘要", h[2], re.I)), None
+        (h for h in entries if re.search(r"\babstract\b|摘要", h["heading"], re.I)),
+        None,
     )
-    start = intro.start() if intro else 0
+    start = intro["start"] if intro else 0
     end = next(
         (
-            h.start()
-            for h in headings
-            if h.start() > start
-            and re.search(r"related work|method|preliminar|相关工作|方法", h[2], re.I)
+            h["start"]
+            for h in entries
+            if h["start"] > start
+            and re.search(
+                r"related work|method|preliminar|相关工作|方法", h["heading"], re.I
+            )
         ),
         len(body),
     )
@@ -83,6 +130,7 @@ async def analyze_revision(
     research_question=None,
     paper=None,
     required_heading=False,
+    exact_heading=None,
 ):
     context = paper or {}
     focus = focus or "overview"
@@ -95,7 +143,7 @@ async def analyze_revision(
         if not rev:
             raise ValueError("缺少指定论文修订")
         existing = work_records(db, wid, rid)
-    offset, size, heading = passage(rev["body"], focus)
+    offset, size, heading = passage(rev["body"], focus, exact_heading)
     if required_heading and not heading:
         raise ValueError("当前固定修订没有匹配的章节标题")
     question = QUESTION
@@ -104,7 +152,7 @@ async def analyze_revision(
     if research_question:
         question += "\n本次待澄清的问题：" + research_question
     for record in existing:
-        if required_heading and not (
+        if (required_heading or exact_heading is not None) and not (
             record["coverage"]["start"] <= offset
             and record["coverage"]["end"] >= offset + size
         ):
@@ -248,6 +296,7 @@ async def read_paper(paper, run_id=None):
             research_question=paper.get("analysis_question"),
             paper=paper,
             required_heading=True,
+            exact_heading=paper.get("exact_heading"),
         )
     aid, ver = arxiv_id(
         paper.get("arxiv_id")
@@ -347,4 +396,5 @@ async def read_paper(paper, run_id=None):
         run_id,
         research_question=paper.get("analysis_question"),
         paper=paper,
+        exact_heading=paper.get("exact_heading"),
     )
