@@ -19,6 +19,19 @@ def artifact_kind(path):
     return "code" if ext in CODE else "weights" if ext in WEIGHTS else "data" if ext in DATA else None
 
 
+async def available_file(client, url):
+    async with client.stream("GET", url, headers={"Range": "bytes=0-255"}) as response:
+        if response.status_code not in (200, 206):
+            return None
+        if "text/html" in response.headers.get("content-type", "").lower():
+            return None
+        prefix = await anext(response.aiter_bytes(chunk_size=256), b"")
+        signature = prefix.lstrip().lower()
+        if not signature or signature.startswith((b"version https://git-lfs.github.com/spec/", b"<!doctype html", b"<html")):
+            return None
+        return response.headers.get("etag") or True
+
+
 async def files_at(url):
     parsed=urlsplit(url); parts=parsed.path.strip("/").split("/")
     if parsed.scheme!="https" or parsed.username or parsed.password: return []
@@ -30,10 +43,14 @@ async def files_at(url):
             branch=info.json()["default_branch"]; head=await client.get(base+"/commits/"+quote(branch,safe=""));head.raise_for_status()
             commit=head.json()["sha"]; tree=head.json()["commit"]["tree"]["sha"]
             req=await client.get(base+"/git/trees/"+tree,params={"recursive":1});req.raise_for_status()
-            found={}
+            found={}; probes={}
             for f in req.json().get("tree",[]):
                 kind=artifact_kind(f["path"])
                 if f.get("type")!="blob" or not kind or kind in found or not f.get("size"): continue
+                if kind in {"weights","data"}:
+                    if probes.get(kind,0)>=3: continue
+                    probes[kind]=probes.get(kind,0)+1
+                    if not await available_file(client,"https://raw.githubusercontent.com/"+name+"/"+commit+"/"+quote(f["path"])): continue
                 found[kind]={"kind":kind,"path":f["path"],"version":f["sha"],"url":"https://github.com/"+name+"/blob/"+commit+"/"+quote(f["path"]),
                     "source_url":str(req.url),"raw":req.text,"locator":f["sha"],"source_version":tree}
             return list(found.values())
@@ -50,11 +67,9 @@ async def files_at(url):
                 path=f.get("rfilename","");kind=artifact_kind(path)
                 if not kind or kind in found:continue
                 location="https://huggingface.co/"+("datasets/" if dataset else "")+name+"/resolve/"+obj["sha"]+"/"+quote(path)
-                async with client.stream("GET",location,headers={"Range":"bytes=0-0"}) as probe:
-                    if probe.status_code not in (200,206) or "text/html" in probe.headers.get("content-type",""):continue
-                    first=await anext(probe.aiter_bytes(),b"")
-                    if not first:continue
-                    version=probe.headers.get("etag") or obj["sha"]
+                available=await available_file(client,location)
+                if not available:continue
+                version=available if isinstance(available,str) else obj["sha"]
                 found[kind]={"kind":kind,"path":path,"version":version,"url":location,"source_url":str(meta.url),
                     "raw":meta.text,"locator":path,"source_version":obj["sha"]}
             return list(found.values())
