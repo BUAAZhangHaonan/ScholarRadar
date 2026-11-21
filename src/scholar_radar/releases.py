@@ -1,4 +1,5 @@
 """Verify concrete repository files on the host that publishes them."""
+import ssl
 from pathlib import PurePosixPath
 from urllib.parse import quote,urlsplit
 import httpx
@@ -19,23 +20,35 @@ def artifact_kind(path):
     return "code" if ext in CODE else "weights" if ext in WEIGHTS else "data" if ext in DATA else None
 
 
-async def available_file(client, url):
-    async with client.stream("GET", url, headers={"Range": "bytes=0-255"}) as response:
-        if response.status_code not in (200, 206):
-            return None
-        if "text/html" in response.headers.get("content-type", "").lower():
-            return None
-        prefix = await anext(response.aiter_bytes(chunk_size=256), b"")
-        signature = prefix.lstrip().lower()
-        if not signature or signature.startswith((b"version https://git-lfs.github.com/spec/", b"<!doctype html", b"<html")):
-            return None
-        return response.headers.get("etag") or True
+async def available_file(client, url, *, github_blob=False):
+    headers = {"Range": "bytes=0-255"}
+    if github_blob:
+        headers["Accept"] = "application/vnd.github.raw+json"
+    try:
+        async with client.stream("GET", url, headers=headers) as response:
+            return await file_signature(response, github_blob)
+    except httpx.TransportError:
+        return None
+
+
+async def file_signature(response, github_blob):
+    if github_blob and response.headers.get("content-type", "").startswith("application/json"):
+        return None
+    if response.status_code not in (200, 206):
+        return None
+    if "text/html" in response.headers.get("content-type", "").lower():
+        return None
+    prefix = await anext(response.aiter_bytes(chunk_size=256), b"")
+    signature = prefix.lstrip().lower()
+    if not signature or signature.startswith((b"version https://git-lfs.github.com/spec/", b"<!doctype html", b"<html")):
+        return None
+    return response.headers.get("etag") or True
 
 
 async def files_at(url):
     parsed=urlsplit(url); parts=parsed.path.strip("/").split("/")
     if parsed.scheme!="https" or parsed.username or parsed.password: return []
-    async with httpx.AsyncClient(timeout=18,follow_redirects=True,headers={"User-Agent":"ScholarRadar research resource verification"}) as client:
+    async with httpx.AsyncClient(verify=ssl.create_default_context(),timeout=18,follow_redirects=True,headers={"User-Agent":"ScholarRadar research resource verification"}) as client:
         if parsed.hostname=="github.com" and len(parts)==2:
             name="/".join(quote(x,safe="") for x in parts)
             base=f"https://api.github.com/repos/{name}"
@@ -50,7 +63,7 @@ async def files_at(url):
                 if kind in {"weights","data"}:
                     if probes.get(kind,0)>=3: continue
                     probes[kind]=probes.get(kind,0)+1
-                    if not await available_file(client,"https://raw.githubusercontent.com/"+name+"/"+commit+"/"+quote(f["path"])): continue
+                    if not await available_file(client,base+"/git/blobs/"+f["sha"],github_blob=True): continue
                 found[kind]={"kind":kind,"path":f["path"],"version":f["sha"],"url":"https://github.com/"+name+"/blob/"+commit+"/"+quote(f["path"]),
                     "source_url":str(req.url),"raw":req.text,"locator":f["sha"],"source_version":tree}
             return list(found.values())
