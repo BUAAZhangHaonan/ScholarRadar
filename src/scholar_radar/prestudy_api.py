@@ -1,4 +1,6 @@
 import json
+import subprocess
+from pathlib import Path
 from typing import Literal
 from fastapi import APIRouter,HTTPException
 from pydantic import BaseModel,Field
@@ -22,6 +24,11 @@ def runtime():
     cfg=deployment().get("arc_runtime")
     if not cfg or any(not cfg.get(k) for k in ("executable","config","env_file","data_dir")):
         raise ValueError("ARC 部署路径尚未配置")
+    cfg=dict(cfg)
+    root=Path(cfg.get("cwd") or Path(cfg["executable"]).resolve().parents[2])
+    if (root/".git").exists():
+        tip=subprocess.run(["git","-C",str(root),"rev-parse","HEAD"],capture_output=True,text=True,timeout=5)
+        if tip.returncode==0: cfg["code_revision"]=tip.stdout.strip()
     return cfg
 
 

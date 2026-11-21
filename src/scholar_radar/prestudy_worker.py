@@ -53,6 +53,10 @@ async def execute(run,payload):
             while result["execution_status"]=="running":
                 await asyncio.sleep(12)
                 result=await command(cfg,"result",hid)
+                if result["execution_status"]=="running":
+                    # ARC protects the exact run with an executor lock. If its
+                    # former owner disappeared, recover the native checkpoint.
+                    result=await command(cfg,"execute",hid)
             save_result(hid,result)
         if result["execution_status"]!="completed": raise StageStopped(result["execution_status"])
     except StageStopped:

@@ -93,7 +93,10 @@ def status():
         else {"services": {}}
     )
     with database() as db:
+        arc=rows(db,"SELECT arc_run_id,result_json FROM arc_handoffs WHERE arc_run_id IS NOT NULL AND result_json IS NOT NULL")
+        receipts={x["arc_run_id"]:json.loads(x["result_json"]).get("cost",{}) for x in arc}
         return {
+            "arc_usage":{"distinct_runs":len(receipts),"receipts":list(receipts.values())},
             "services": {
                 k: {
                     "status": v["status"],
