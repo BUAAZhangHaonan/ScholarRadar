@@ -149,7 +149,6 @@ def read_section(wid:str,focus:str,data:SectionRequest|None=None):
         if not row: raise ValueError("所选论文修订尚无可继续的精读记录")
         start,size,heading=passage(row["body"],focus)
         if not heading: raise ValueError("已解析全文没有匹配的章节标题")
-        rid=update_run(db)
         payload={"key":row["work_key"],"origin_run_id":row["run_id"],"focus":focus,"revision_id":row["revision_id"]}
         if request.question: payload["question"]=request.question
         # Reuse a previously queued exact request, including legacy section jobs.
@@ -157,5 +156,6 @@ def read_section(wid:str,focus:str,data:SectionRequest|None=None):
              AND json_extract(payload,'$.revision_id')=? AND coalesce(json_extract(payload,'$.question'),'')=?
              ORDER BY rowid LIMIT 1""",(focus,row["revision_id"],request.question or "")).fetchone()
         if past: return {"job_id":past["id"],"run_id":past["run_id"],"heading":heading,"start":start,"end":start+size,"reused":True}
+        rid=update_run(db)
         jid=job(db,rid,"read",payload);arrange(db,rid,("archive",))
         return {"job_id":jid,"run_id":rid,"heading":heading,"start":start,"end":start+size,"reused":False}

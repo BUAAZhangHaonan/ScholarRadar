@@ -124,6 +124,10 @@ async def shortlist(papers, profile, limit, run_id=None):
         records=[{"id":ident,"title":p["title"],"abstract":p.get("abstract") or "",
                   "date":p.get("published_date") or p.get("year"),
                   "features":active_signals(db,p.get("work_id"),cutoff)} for ident,p in items.items()]
+    # Constant features cannot distinguish candidates in this decision.
+    variable={k for r in records for k in r["features"]
+              if len({str(v["features"].get(k)) for v in records})>1}
+    for row in records: row["features"]={k:v for k,v in row["features"].items() if k in variable}
     prompt=("从给定候选选出确实对当前问题有帮助的工作，细读完整摘要，不按标题热词选。"
         "结合明确评价过的对象与具体原因，区分支持、反例、限制和相邻机会。"
         "输出 {selected:[{id,reason,theme,evidence_focus,direction_ids,feedback_ids}]}。"

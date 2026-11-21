@@ -2,10 +2,9 @@ import json
 from datetime import date, timedelta
 
 from .db import rows
-from .factors import propose
 from .settings import dump, now
 
-RULES = {"has_located_evidence", "linked_resource", "independent_support"}
+RULES = {"has_located_evidence", "linked_resource", "same_direction_work_count"}
 
 
 def measure(db, rule, wid, cutoff):
@@ -18,6 +17,7 @@ def measure(db, rule, wid, cutoff):
             "SELECT EXISTS(SELECT 1 FROM factor_input_times WHERE kind='resource' AND entity=? AND at<=?)",
             (wid, cutoff),
         ).fetchone()[0]
+    if rule!="same_direction_work_count": raise ValueError("没有可执行的因子定义")
     return db.execute(
         """SELECT count(DISTINCT m2.work_id) FROM memberships m JOIN memberships m2 ON m.direction_id=m2.direction_id
           WHERE m.work_id=? AND m2.work_id!=m.work_id AND m.created_at<=? AND m2.created_at<=?""",
@@ -35,19 +35,6 @@ def active_signals(db, wid, cutoff):
 
 
 def refresh(db, run_id=None):
-    if not db.execute("SELECT 1 FROM proposals LIMIT 1").fetchone():
-        propose(
-            db,
-            {
-                "target": "阅读后能否明确说出研究判断的变化",
-                "input": "固定候选中的作品是否拥有可回查原文",
-                "method": "has_located_evidence",
-                "window_days": 28,
-                "missing": "保留未知",
-                "overlap": "与证据进展因子比较",
-                "comparison": "同一候选、同一截止时间，盲评与时间相关性基准分歧的作品",
-            },
-        )
     sets = rows(
         db, "SELECT * FROM evaluations WHERE (? IS NULL OR run_id=?)", (run_id, run_id)
     )
@@ -86,7 +73,7 @@ def refresh(db, run_id=None):
                     evaluation["id"],
                     dump(ranked[: len(baseline)]),
                     now(),
-                    "pending",
+                    "pending" if len(set(score.values()))>1 else "non_discriminating",
                     str(due),
                 ),
             )
@@ -95,7 +82,7 @@ def refresh(db, run_id=None):
 def disagreements(db, evaluation):
     alt = set(json.loads(evaluation["selected"]))
     for row in db.execute(
-        "SELECT order_json FROM shadow_choices WHERE evaluation_id=?",
+        "SELECT order_json FROM shadow_choices WHERE evaluation_id=? AND status!='non_discriminating'",
         (evaluation["id"],),
     ):
         alt.update(json.loads(row[0]))
