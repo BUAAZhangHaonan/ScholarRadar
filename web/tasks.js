@@ -11,7 +11,7 @@ async function detail(id){
   $("#app").innerHTML='<a class="breadcrumb" href="/tasks">← 研究任务</a><header class="page-head"><div><h1>'+esc(title)+'</h1>'+
     '<p class="sub">'+esc([stageName(task.stage),stageStatus(task),humanDate(task.updated_at||task.created_at)].join(" · "))+'</p></div></header>'+
     '<div class="flow"><div><a href="'+original(task)+'">回到'+esc(task.direction_title||"原方向")+'</a></div>'+
-    presentation(task)+(["connection_unknown","paused_external"].includes(task.status)?'<p><button id="resume-task">恢复原任务</button></p>':"")+'</div>';
+    presentation(task,{showFocus:false})+(["connection_unknown","paused_external"].includes(task.status)?'<p><button id="resume-task">恢复原任务</button></p>':"")+'</div>';
   if($("#resume-task"))$("#resume-task").onclick=async e=>{const b=e.currentTarget;b.disabled=true;try{
     await send("/api/prestudies/"+encodeURIComponent(id)+"/resume",{});await detail(id)
   }catch(ex){b.disabled=false;msg(ex.message)}};

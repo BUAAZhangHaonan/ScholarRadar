@@ -9,7 +9,7 @@ export function stageStatus(task){
   if(isActive(task))return task.status==="queued"?"已加入研究任务":"正在查阅";
   if(["failed","error","interrupted","unknown_outcome","connection_unknown","paused_external","needs_attention","blocked"].includes(task.status)||
      ["failed","error","interrupted","unknown_outcome","connection_unknown","paused_external","needs_attention","blocked"].includes(task.execution_status)) return "需要处理";
-  if(task.evidence_limited)return "现有材料受限";
+  if(task.evidence_limited)return ["现有材料受限",decisionNames[task.research_decision]].filter(Boolean).join(" · ");
   return decisionNames[task.research_decision]||"已有结果";
 }
 const readingLevels={metadata:"元数据",abstract:"摘要",snippet:"摘录",excerpt:"原文片段",partial:"部分原文",full:"全文",full_text:"全文",parsed_text:"解析文本",notes:"阅读笔记",
@@ -49,9 +49,12 @@ function draftBody(task){
   if(task.draft_text)return task.draft_text;
   if(typeof task.draft==="string")return task.draft;
   const draft=task.draft||{};
-  return [draft.current_understanding,draft.text,draft.overview,draft.decision_reason].filter(x=>typeof x==="string").join("\n\n")||task.current_understanding||"";
+  const understanding=draft.current_understanding||task.current_understanding;
+  const paragraphs=[draft.text,draft.overview,draft.reason,draft.decision_reason,
+    typeof understanding==="string"?understanding:understanding?.core_insight,draft.feasibility,draft.main_risk];
+  return [...new Set(paragraphs.filter(x=>typeof x==="string"&&x.trim()))].join("\n\n");
 }
-export function presentation(task){
+export function presentation(task,{showFocus=true}={}){
   const p=task.presentation||{},sources=task.sources||[];
   const seen=new Set();
   function once(text){if(typeof text!=="string"||!text.trim()||seen.has(text))return "";seen.add(text);return originalText(text,sources)}
@@ -61,14 +64,14 @@ export function presentation(task){
   const polished=Boolean(p.overview||p.stage_summary||p.candidates?.some(c=>c.text));
   const raw=polished?once(p.stage_summary)+once(p.overview)+candidates:
     (draftBody(task)?'<h3>研究原稿</h3>'+once(draftBody(task)):"");
-  return '<div class="stage-result">'+(task.focus?'<div class="label">本次问题</div>'+prose(task.focus):"")+
+  return '<div class="stage-result">'+(showFocus&&task.focus?'<div class="label">本次问题</div>'+prose(task.focus):"")+
     (raw||prose(isActive(task)?"研究结果准备好后会出现在这里。":(task.error_message||"本阶段还没有可阅读的正文。")))+
     (p.technical_analysis?'<details><summary>技术分析</summary>'+once(p.technical_analysis)+'</details>':"")+
     (task.next_question?'<h3>下一步要明确的问题</h3>'+once(task.next_question):"")+
     sourceList(task)+'</div>';
 }
-function requestKey(did,sid,stage,focus,idea){
-  const key="radar-prestudy:"+JSON.stringify([did,sid,stage,focus,idea||""]);
+function requestKey(did,sid,stage,focus,idea,profile){
+  const key="radar-prestudy:"+JSON.stringify([did,sid,profile,stage,focus,idea||""]);
   let val=sessionStorage.getItem(key);
   if(!val){val=reqid();sessionStorage.setItem(key,val)}
   return val;
@@ -93,6 +96,12 @@ export async function attachPrestudy(root, direction, snapshot) {
         if(!box.isConnected||!box.open)return;
         try{const task=await api("/api/prestudies/"+encodeURIComponent(t.id));if(!box.isConnected)return;
           $("[data-output]",box).innerHTML=presentation(task)+'<p><a href="'+pathFor("tasks",t.id)+'">单独打开此任务</a></p>';
+          if(["connection_unknown","paused_external"].includes(task.status)){
+            const resume=document.createElement("button");resume.className="quiet";resume.textContent="恢复原任务";
+            $("[data-output]",box).append(resume);
+            resume.onclick=async()=>{resume.disabled=true;try{await send("/api/prestudies/"+encodeURIComponent(t.id)+"/resume",{});await refresh()}
+              catch(e){resume.disabled=false;msg(e.message)}};
+          }
           loaded=true;
           if(isActive(task))setTimeout(refresh,9000);
         }catch(e){$("[data-output]",box).innerHTML='<p class="error">'+esc(e.message)+'</p>'}
@@ -115,7 +124,7 @@ export async function attachPrestudy(root, direction, snapshot) {
         ev.preventDefault();const values=new FormData(form),focus=String(values.get("focus")||"").trim(),idea=values.get("idea")||null;
         const button=$('[type="submit"]',form);button.disabled=true;
         try{const result=await send("/api/directions/"+encodeURIComponent(did)+"/prestudies",
-          {snapshot_id:snapshot,stage,focus,idea_id:idea,request_id:requestKey(did,snapshot,stage,focus,idea)});
+          {snapshot_id:snapshot,stage,focus,idea_id:idea,request_id:requestKey(did,snapshot,stage,focus,idea,direction.current_profile_id)});
           existing=await api("/api/directions/"+encodeURIComponent(did)+"/prestudies");
           msg(result.reused?"已打开已有研究任务":"研究任务已提交");await draw(result.id||result.task_id);
           document.getElementById("prestudy-"+(result.id||result.task_id))?.scrollIntoView({block:"nearest"});

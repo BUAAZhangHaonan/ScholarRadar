@@ -214,7 +214,9 @@ def direction_reading(did: str, snapshot: str | None = None):
                 feasibility=body.get("feasibility"),forecast=body.get("forecast"),
                 career=body.get("job_match"),action=body.get("action"),resources=body.get("resources"),
                 limitation=body.get("limitation"),method=body.get("method"),setting=body.get("setting"))
+        profile=db.execute("SELECT id FROM profiles ORDER BY rowid DESC LIMIT 1").fetchone()
         return {**dict(direction),"current":current,"timeline":timeline,"followed":follow_state(db,did),
+                "current_profile_id":profile[0] if profile else None,
                 "relations":rows(db,"SELECT * FROM direction_relations WHERE from_id=? OR to_id=?",(did,did))}
 
 
