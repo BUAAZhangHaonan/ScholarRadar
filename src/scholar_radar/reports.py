@@ -3,6 +3,7 @@ from datetime import date, timedelta
 
 from .db import database, key, rows
 from .models import ask
+from .evidence import versioned_url
 from .profile import get_profile
 from .settings import ROOT, atomic_text, dump, now
 
@@ -54,7 +55,10 @@ def evidence_rows(db, ids):
     sql = """SELECT e.id,e.quote,e.start,e.end,e.line_start,e.line_end,v.id revision_id,v.version,v.mode,
            d.url,d.kind,d.work_id,w.title FROM evidence e JOIN revisions v ON e.revision_id=v.id
            JOIN documents d ON v.document_id=d.id LEFT JOIN works w ON w.id=d.work_id WHERE e.id IN ("""
-    return rows(db, sql + ",".join("?" for i in ids) + ")", ids)
+    evidence = rows(db, sql + ",".join("?" for i in ids) + ")", ids)
+    for item in evidence:
+        item["url"] = versioned_url(item["url"], item["version"])
+    return evidence
 
 
 def export(db, rid, selected):

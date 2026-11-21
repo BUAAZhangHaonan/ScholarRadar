@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from .db import database, rows
 from .reports import evidence_rows
+from .evidence import versioned_url
 
 router = APIRouter()
 
@@ -484,6 +485,11 @@ def paper_reading(wid: str):
                        ON d.id=m.direction_id WHERE m.work_id=? AND d.status!='merged' ORDER BY d.title""",
             (wid,),
         )
+        document_urls = {r["id"]: r["url"] for r in db.execute(
+            "SELECT v.id,d.url FROM revisions v JOIN documents d ON d.id=v.document_id WHERE d.work_id=?", (wid,)
+        )}
+        for record in readable:
+            record["url"] = versioned_url(document_urls.get(record["revision_id"]), record["version"])
         return {
             "id": wid,
             "title": work["title"],

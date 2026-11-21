@@ -154,6 +154,7 @@ async function detail(id) {
           .join("") +
         "</select></label>"
       : "";
+  const paperURL = records[0]?.url || work.url;
   document.title = work.title + " · ScholarRadar";
   $("#app").innerHTML =
     '<a class="breadcrumb" href="/library">← 文献</a><header class="page-head"><div><h1>' +
@@ -161,9 +162,9 @@ async function detail(id) {
     "</h1>" +
     '<div class="row sub">' +
     esc([work.date, records[0]?.version].filter(Boolean).join(" · ")) +
-    (work.url
+    (paperURL
       ? '　<a href="' +
-        safeURL(work.url) +
+        safeURL(paperURL) +
         '" target="_blank" rel="noopener">论文原文 ↗</a>'
       : "") +
     "</div></div>" +

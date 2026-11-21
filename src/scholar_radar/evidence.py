@@ -35,6 +35,16 @@ def arxiv_id(value):
     return base, m[2] or ""
 
 
+def versioned_url(url, version):
+    if not url or not re.fullmatch(r"v[1-9][0-9]*", version or ""):
+        return url
+    parsed = urlsplit(url)
+    if parsed.hostname not in {"arxiv.org", "export.arxiv.org", "www.arxiv.org"}:
+        return url
+    base, _ = arxiv_id(url)
+    return f"https://arxiv.org/abs/{base}{version}" if base else url
+
+
 def work(db, title, ids, meta=None):
     normalized = set()
     for ns, val in ids.items():

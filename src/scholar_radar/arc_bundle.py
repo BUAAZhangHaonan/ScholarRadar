@@ -1,6 +1,7 @@
 """Freeze the selected snapshot and the contiguous source passages actually read."""
 import json
 from .db import key,rows
+from .evidence import versioned_url
 from .profile import get_profile
 from .settings import dump
 
@@ -21,8 +22,7 @@ def selected_bundle(db,did,sid,stage,focus,previous_idea=None):
         # Preserve one contiguous interval per source and its offsets in the parser's representation.
         start=max(0,e["start"]-220); end=min(len(e["body"]),e["end"]+220)
         content=e["body"][start:end]
-        url=e["url"]
-        if e["version"] and "arxiv.org/abs/" in url and not url.endswith(e["version"]): url+=e["version"]
+        url=versioned_url(e["url"], e["version"])
         sources.append({"external_source_id":e["id"],"title":e["title"] or ("官方岗位详情" if e["kind"]=="job" else "已核验材料"),
             "url":url,"version":e["version"] or e["upstream_revision"],"revision_id":e["revision_id"],
             "work_id":e["work_id"],"evidence_ids":[e["id"]],"access":"passage","content":content,
