@@ -12,7 +12,7 @@ def record(db,kind,entity,why,features,*,pid=None,sid=None,evaluation=None,origi
 
 
 def paper_features(p):
-    return {"title":p.get("title"),"published":p.get("published_date") or p.get("year"),
+    return {"paper_signature":key(p.get("title"),p.get("abstract") or "",p.get("arxiv_id"),p.get("doi"),p.get("published_date"),p.get("version")),"title":p.get("title"),"published":p.get("published_date") or p.get("year"),
             "abstract":p.get("abstract") or "", "public_locator":bool(p.get("arxiv_id") or p.get("pdf_url")),
             "research_questions":p.get("direction_ids") or [],"topic":p.get("theme_hint") or ""}
 
@@ -31,6 +31,8 @@ def context_for(db,kind,entity,snapshot_id=None):
                         "personal_connection":body.get("feasibility"),"work_ids":body.get("work_ids",[])},
                        pid=s["profile_id"],sid=s["id"],origin="direction",at=s["generated_at"])
     if kind=="work":
+        existing=db.execute("SELECT id FROM recommendation_contexts WHERE entity_type='work' AND entity_id=? AND origin IN ('screen','baseline') ORDER BY recorded_at DESC,CASE origin WHEN 'screen' THEN 0 ELSE 1 END,rowid DESC LIMIT 1",(entity,)).fetchone()
+        if existing:return existing[0]
         last=db.execute("""SELECT l.paper,e.id evaluation,e.as_of,r.profile_id,r.created_at FROM readings l
             JOIN runs r ON r.id=l.run_id LEFT JOIN evaluations e ON e.run_id=r.id
             WHERE json_extract(l.paper,'$.work_id')=? ORDER BY r.created_at DESC LIMIT 1""",(entity,)).fetchone()
@@ -67,7 +69,7 @@ def bind(db,fid,kind,entity,recommendation=None,snapshot=None,action=None):
 
 def signals(db,cutoff=None,limit=12):
     result=rows(db,"""SELECT f.id,f.entity_type,f.entity_id,f.dimension,f.value,f.reason,f.created_at,
-          c.snapshot_id,c.action_id,r.reason recommended_because,r.features FROM feedback f
+          c.snapshot_id,c.action_id,r.profile_id,r.evaluation_id,r.reason recommended_because,r.features FROM feedback f
           JOIN feedback_contexts c ON c.feedback_id=f.id LEFT JOIN recommendation_contexts r ON r.id=c.recommendation_id
           WHERE f.dimension IN ('reading_value','comparison','career_value') AND (? IS NULL OR f.created_at<=?)
           ORDER BY f.created_at DESC,f.rowid DESC LIMIT ?""",(cutoff,cutoff,limit))
@@ -102,3 +104,13 @@ def compare(db,evaluation_id):
         labels[f[0]]=f[1]
     return {k:{"candidates":len(ids),"rated":len(ids&labels.keys()),"useful":sum(labels.get(i)=="useful" for i in ids)}
             for k,ids in groups.items()}
+
+def baseline_contexts(db,run_id):
+    e=db.execute("SELECT e.*,r.profile_id,r.created_at FROM evaluations e JOIN runs r ON r.id=e.run_id WHERE e.run_id=?",(run_id,)).fetchone()
+    if not e:return
+    included=set(json.loads(e["selected"]))
+    for wid in json.loads(e["baseline"]):
+        if wid in included:continue
+        w=db.execute("SELECT title,metadata FROM works WHERE id=?",(wid,)).fetchone()
+        if w: record(db,"work",wid,"同一候选集按主题相关性和日期排序",paper_features({**json.loads(w["metadata"]),"title":w["title"]}),
+                     pid=e["profile_id"],evaluation=e["id"],origin="baseline",at=e["created_at"])

@@ -114,7 +114,7 @@ async def shortlist(papers, profile, limit, run_id=None):
     from .shadow import active_signals
     from .db import database,rows
     from .settings import now
-    from .recommendations import signals
+    from .recommendations import signals,paper_features
     with database() as db:
         taxonomy=rows(db,"SELECT id,question FROM directions WHERE status!='merged' ORDER BY id")
         feedback=signals(db,limit=10)
@@ -124,6 +124,19 @@ async def shortlist(papers, profile, limit, run_id=None):
         records=[{"id":ident,"title":p["title"],"abstract":p.get("abstract") or "",
                   "date":p.get("published_date") or p.get("year"),
                   "features":active_signals(db,p.get("work_id"),cutoff)} for ident,p in items.items()]
+    latest={}
+    for f in feedback:
+        if f["entity_type"]=="work" and f["dimension"]=="reading_value":
+            latest.setdefault(f["entity_id"],f)
+    # A negative verdict on this exact paper is local to its unchanged material
+    # and research profile. Other works, updated versions and time deferrals remain eligible.
+    def unchanged_negative(p):
+        f=latest.get(p.get("work_id"))
+        return bool(f and f["value"]=="irrelevant" and (not f["profile_id"] or f["profile_id"]==profile["id"])
+                    and f["features"].get("paper_signature")==paper_features(p)["paper_signature"])
+    records=[r for r in records if not unchanged_negative(items[r["id"]])]
+    admissible={r["id"] for r in records}
+    if not records:return []
     # Constant features cannot distinguish candidates in this decision.
     variable={k for r in records for k in r["features"]
               if len({str(v["features"].get(k)) for v in records})>1}
@@ -138,7 +151,7 @@ async def shortlist(papers, profile, limit, run_id=None):
     chosen=[]; seen=set()
     for item in result.get("selected",[]):
         ident=item.get("id")
-        if ident not in items or ident in seen: continue
+        if ident not in admissible or ident in seen: continue
         seen.add(ident)
         chosen.append({**items[ident],"selection_reason":str(item.get("reason") or ""),
             "evidence_focus":item.get("evidence_focus") if item.get("evidence_focus") in ("method","evaluation","limits") else "evaluation",

@@ -248,7 +248,8 @@ async def screen(run):
                 run["as_of"],
             ),
         )
-        from .recommendations import record,paper_features
+        from .recommendations import record,paper_features,baseline_contexts
+        baseline_contexts(db,rid)
         for p in selection:
             record(db,"work",p["work_id"],p.get("selection_reason") or "",paper_features(p),
                    pid=run["profile_id"],evaluation=key("baseline",rid),origin="screen",used=p.get("feedback_ids",[]))
