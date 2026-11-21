@@ -142,6 +142,12 @@ def project_report(db, kind, selected_date):
         item=card_excerpt(db,snapshot["direction_id"],sid,snapshot["card"],relevant,actions.get(sid))
         items.append(apply_editorial(item,edits.get(sid,{})))
     review = report.get("review") or {}
+    unanswered=review.get("unresolved") or []
+    if isinstance(unanswered,str): unanswered=[unanswered]
+    unresolved=[]
+    for question in unanswered:
+        value=question if isinstance(question,str) else question.get("question") if isinstance(question,dict) else None
+        if value and value.strip() not in unresolved: unresolved.append(value.strip())
     pick = review.get("proposal") or {}
     proposed = next((a for a in actions.values() if (a.get("action_id") or a.get("id"))==pick.get("action_id")),None)
     proposal = None
@@ -175,7 +181,7 @@ def project_report(db, kind, selected_date):
         "items":items,"watch":[{"direction_id":w.get("dir_id"),"snapshot_id":w.get("id"),"question":w.get("question")}
                               for w in report.get("watch",[]) if w.get("dir_id")],
         "readings":reading_links,
-        "proposal":proposal,"updates":updates,"evolution":evolution,
+        "proposal":proposal,"updates":updates,"evolution":evolution,"unresolved":unresolved,
     }
 
 

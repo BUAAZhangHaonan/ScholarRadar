@@ -93,6 +93,7 @@ export async function render(){
     '</header><div class="flow">'+headline+(lead?mainStory(lead):solo)+none+
     (other.length?'<section class="rule-section"><h2 class="section-title">其他变化</h2><ul class="list">'+other.map(restStory).join("")+'</ul></section>':"")+
     news+weeklyProposal(report.proposal)+periodEvolution(report.evolution)+
+    (report.unresolved?.length?'<section class="rule-section"><h2 class="section-title">仍待回答的问题</h2><ul class="list">'+report.unresolved.map(q=>'<li>'+prose(q)+'</li>').join("")+'</ul></section>':"")+
     (report.readings?.length?'<section class="rule-section"><h2 class="section-title">本期精读</h2>'+materialList(report.readings)+'</section>':"")+watch+'</div>';
   $("#period-date").onchange=e=>location.assign(reportUrl(kind,e.target.value));
   enableActions($("#app"));
