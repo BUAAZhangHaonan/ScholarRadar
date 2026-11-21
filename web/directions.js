@@ -246,6 +246,7 @@ async function listDirections() {
     options(
       [
         ["", "全部"],
+        ["followed", "已关注"],
         ["tracking", "跟踪中"],
         ["candidate", "候选"],
         ["accepted", "已接受"],

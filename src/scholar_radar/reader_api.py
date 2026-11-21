@@ -119,45 +119,45 @@ def editorial_for_snapshot(db, snapshot_id):
 
 def direction_summaries(db, layer=None, status=None):
     result = []
+    criterion = None if status == "followed" else status
     directions = rows(
         db,
-        """SELECT d.*,(SELECT count(*) FROM snapshots s WHERE s.dir_id=d.id) snapshot_count
-        FROM directions d WHERE (? IS NULL OR d.layer=?) AND (? IS NULL OR d.status=? OR EXISTS
-        (SELECT 1 FROM actions a JOIN snapshots s ON a.snapshot_id=s.id WHERE s.dir_id=d.id AND a.status=?))""",
-        (layer, layer, status, status, status),
+        """SELECT d.*,(SELECT count(*) FROM snapshots s WHERE s.dir_id=d.id) snapshot_count,
+        last.id last_id,last.generated_at last_date,approved.id good_id,approved.body good_body
+        FROM directions d
+        LEFT JOIN snapshots last ON last.id=(SELECT sl.id FROM snapshots sl WHERE sl.dir_id=d.id
+                                             ORDER BY sl.generated_at DESC,sl.rowid DESC LIMIT 1)
+        LEFT JOIN snapshots approved ON approved.id=(SELECT sx.id FROM snapshots sx JOIN assessment_reviews ar
+              ON ar.snapshot_id=sx.id AND ar.verdict='supported' WHERE sx.dir_id=d.id
+              ORDER BY sx.generated_at DESC,sx.rowid DESC LIMIT 1)
+        WHERE (? IS NULL OR d.layer=?) AND (? IS NULL OR d.status=? OR EXISTS(
+              SELECT 1 FROM actions a JOIN snapshots so ON so.id=a.snapshot_id WHERE so.dir_id=d.id AND a.status=?))""",
+        (layer, layer, criterion, criterion, criterion),
     )
     for d in directions:
-        snapshots = rows(
-            db,
-            """SELECT s.id,s.generated_at,s.body,r.verdict FROM snapshots s
-            LEFT JOIN assessment_reviews r ON r.snapshot_id=s.id WHERE s.dir_id=?
-            ORDER BY s.generated_at DESC,s.rowid DESC""",
-            (d["id"],),
-        )
-        approved = next((s for s in snapshots if s["verdict"] == "supported"), None)
-        latest = snapshots[0] if snapshots else None
+        followed = follow_state(db, d["id"])
+        if status == "followed" and not followed:
+            continue
+        good_id, good_body = d.pop("good_id"), d.pop("good_body")
+        latest_id, latest_date = d.pop("last_id"), d.pop("last_date")
         projection = (
-            card_excerpt(db, d["id"], approved["id"], json.loads(approved["body"]))
-            if approved
-            else {}
+            card_excerpt(db, d["id"], good_id, json.loads(good_body)) if good_id else {}
         )
-        if approved:
-            apply_editorial(projection, editorial_for_snapshot(db, approved["id"]))
+        if good_id:
+            apply_editorial(projection, editorial_for_snapshot(db, good_id))
         d.update(
-            latest_snapshot_id=approved["id"]
-            if approved
-            else (latest["id"] if latest else None),
+            latest_snapshot_id=good_id if good_id else latest_id,
             latest_judgment=projection.get("judgment"),
             latest_change=projection.get("change"),
-            latest_updated_at=latest["generated_at"] if latest else d["created_at"],
+            latest_updated_at=latest_date or d["created_at"],
             personal_fit_summary=projection.get("personal_fit"),
             next_action=projection.get("next_step"),
             action_state=projection.get("action_state"),
             key_papers=[m for m in projection.get("materials", []) if m.get("work_id")],
-            followed=follow_state(db, d["id"]),
+            followed=followed,
             review_state="supported"
-            if approved
-            else ("watch" if latest else "tracking"),
+            if good_id
+            else ("watch" if latest_id else "tracking"),
         )
         result.append(d)
     return sorted(
