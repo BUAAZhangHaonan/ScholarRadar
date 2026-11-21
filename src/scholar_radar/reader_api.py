@@ -188,12 +188,15 @@ def project_report(db, kind, selected_date):
             + " ORDER BY as_of DESC,created_at DESC LIMIT 1",
             args,
         ).fetchone()
+        state = "empty"
+        if pending and pending[0] in {"queued", "running"}:
+            state = "working"
+        elif pending and pending[0] in {"partial", "failed", "interrupted"}:
+            state = "attention"
         return {
             "date": str(selected_date) if selected_date else None,
             "kind": kind,
-            "state": "working"
-            if pending and pending[0] in {"queued", "running"}
-            else "empty",
+            "state": state,
             "summary": None,
             "items": [],
             "watch": [],

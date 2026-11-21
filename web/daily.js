@@ -261,11 +261,17 @@ export async function render() {
         empty(
           report.state === "working"
             ? "正在查阅这一期的材料。"
-            : report.state === "empty"
-              ? "这个日期还没有发布报告。"
-              : "这一期还没有形成新的研究判断。",
+            : report.state === "attention"
+              ? "这期报告尚未生成，有一项研究任务需要处理。"
+              : report.state === "empty"
+                ? "这个日期还没有发布报告。"
+                : "这一期还没有形成新的研究判断。",
         ) +
-        '<a href="/directions">继续阅读已有方向</a></section>'
+        '<div class="story-actions"><a href="/directions">继续阅读已有方向</a>' +
+        (report.state === "attention"
+          ? '<a href="/maintenance">查看待处理任务</a>'
+          : "") +
+        "</div></section>"
       : "";
   $("#app").innerHTML =
     '<header class="page-head"><div><h1>' +
