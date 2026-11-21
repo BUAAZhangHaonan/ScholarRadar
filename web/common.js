@@ -67,31 +67,28 @@ export function modal(title, html) {
   const d = $("#detail");
   if (!d.open) d.showModal();
 }
+let citationRequest = 0;
 export async function showEvidence(id) {
-  const e = await api("/api/evidence/" + encodeURIComponent(id));
-  modal(
-    e.title || "官方岗位原文",
-    '<p class="meta">' +
-      esc(
-        (e.version || "文档修订") +
-          " · " +
-          e.document_revision +
-          " · 第 " +
-          e.line_start +
-          "–" +
-          e.line_end +
-          " 行",
-      ) +
-      '</p><div class="context">' +
-      esc(e.before) +
-      '</div><blockquote class="quote">' +
-      esc(e.quote) +
-      '</blockquote><div class="context">' +
-      esc(e.after) +
-      '</div><p><a target="_blank" rel="noopener" href="' +
-      safeURL(e.url) +
-      '">打开原始来源 ↗</a></p>',
-  );
+  const ticket = ++citationRequest;
+  const opener = document.activeElement;
+  const scroll = [window.scrollX, window.scrollY];
+  const evidence = await api("/api/evidence/" + encodeURIComponent(id));
+  if (ticket !== citationRequest) return;
+  const drawer = $("#evidence-drawer");
+  $("#evidence-title").textContent = evidence.title || "原始材料";
+  $("#evidence-body").innerHTML =
+    '<p class="sub">' + esc(evidence.version || "") + '</p>' +
+    '<div class="context">' + esc(evidence.before) + '</div>' +
+    '<blockquote class="quote">' + esc(evidence.quote) + '</blockquote>' +
+    '<div class="context">' + esc(evidence.after) + '</div>' +
+    '<p class="story-actions"><a target="_blank" rel="noopener" href="' +
+    safeURL(evidence.url) + '">打开原始来源 ↗</a></p>';
+  drawer.addEventListener("close", () => {
+    if (opener?.isConnected) opener.focus({preventScroll:true});
+    window.scrollTo(...scroll);
+  }, {once:true});
+  if (!drawer.open) drawer.showModal();
+  drawer.scrollTop=0;
 }
 export const reqid = () =>
   globalThis.crypto?.randomUUID?.() ||

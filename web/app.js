@@ -9,6 +9,7 @@ const routes = {
 for (const nav of document.querySelectorAll("nav a"))
   if (nav.pathname === location.pathname)
     nav.setAttribute("aria-current", "page");
+$("#evidence-close").onclick = () => $("#evidence-drawer").close();
 $("#close").onclick = () => $("#detail").close();
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-evidence]");
