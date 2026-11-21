@@ -468,7 +468,7 @@ async def assess(run, direction_ids=None):
                             profile["id"],
                             sig,
                             old["snapshot_id"] if old else None,
-                            reason.strip(),
+                            restore_ids(reason.strip()),
                             dump([e["id"] for e in trigger]),
                         ),
                     )
