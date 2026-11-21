@@ -13,10 +13,21 @@ async def verify_resources(run, limit=2):
     with database() as db:
         candidates = rows(
             db,
-            """SELECT r.id,r.url,count(DISTINCT w.work_id) cited FROM resources r JOIN work_resources w ON r.id=w.resource_id
-               LEFT JOIN resource_observations o ON o.resource_id=r.id
-               WHERE r.url LIKE 'https://github.com/%' OR r.url LIKE 'https://huggingface.co/%'
-               GROUP BY r.id ORDER BY (max(o.observed_at) IS NULL) DESC,max(o.observed_at),cited DESC,r.id LIMIT ?""",
+            """WITH candidates AS (
+                   SELECT r.id,r.url,max(o.observed_at) last_seen,
+                          count(DISTINCT w.work_id) cited,
+                          max(EXISTS(SELECT 1 FROM memberships m WHERE m.work_id=w.work_id)) direction_linked
+                   FROM resources r JOIN work_resources w ON r.id=w.resource_id
+                   LEFT JOIN resource_observations o ON o.resource_id=r.id
+                   WHERE r.url LIKE 'https://github.com/%' OR r.url LIKE 'https://huggingface.co/%'
+                   GROUP BY r.id
+               ), rotation AS (
+                   SELECT *,row_number() OVER (
+                       PARTITION BY (last_seen IS NULL)
+                       ORDER BY last_seen,direction_linked DESC,cited DESC,id
+                   ) turn FROM candidates
+               )
+               SELECT id,url FROM rotation ORDER BY turn,(last_seen IS NULL) DESC LIMIT ?""",
             (limit,),
         )
     day = date.fromisoformat(run["as_of"])
