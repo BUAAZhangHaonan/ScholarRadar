@@ -324,6 +324,8 @@ def project_report(db, kind, selected_date):
         }
         for d in report.get("evolution", [])
     ]
+    order={entry["snapshot_id"]:i for i,entry in enumerate((report.get("editorial") or {}).get("items",[])) if entry.get("snapshot_id")}
+    if kind=="daily" and order:items.sort(key=lambda item:order.get(item["snapshot_id"],len(order)))
     return {
         "date": report.get("date"),
         "kind": kind,

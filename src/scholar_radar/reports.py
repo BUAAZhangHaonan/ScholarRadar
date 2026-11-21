@@ -263,7 +263,7 @@ async def publish(run):
         )
     report = {**obj, "kind": kind, "date": str(day), "issues": issues, "watch": pending}
     report.update(evolution=series,research_updates=updates)
-    report["snapshot_id"] = key("research-edition-v2",obj["snapshot_id"], issues, obj["coverage"], pending,series,updates,feedback)
+    report["snapshot_id"] = key("research-edition-v2-reading-2",obj["snapshot_id"], issues, obj["coverage"], pending,series,updates,feedback)
     with database() as db:
         saved = db.execute(
             "SELECT body FROM report_versions WHERE id=?", (report["snapshot_id"],)
