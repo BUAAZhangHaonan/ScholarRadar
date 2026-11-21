@@ -23,7 +23,7 @@ from .changes import current_run
 from .prestudy_worker import execute as execute_arc
 
 STAGES = {
-    "arc_stage":execute_arc,
+    "arc_stage": execute_arc,
     "discover": collect,
     "official": postings,
     "observe": observe,
@@ -53,7 +53,7 @@ async def execute(run, job, owner):
     from .discovery import active_scope
 
     scope_token = active_scope.set(run["scope"])
-    source_token=current_run.set(run)
+    source_token = current_run.set(run)
     beat = asyncio.create_task(heartbeat(job["id"], owner))
     try:
         if job["stage"] == "discover":
@@ -61,7 +61,7 @@ async def execute(run, job, owner):
         handler = STAGES[job["stage"]]
         detail = await (
             handler(run, json.loads(job["payload"]))
-            if job["stage"] in {"read","arc_stage"}
+            if job["stage"] in {"read", "arc_stage"}
             else handler(run)
         )
         ok = True

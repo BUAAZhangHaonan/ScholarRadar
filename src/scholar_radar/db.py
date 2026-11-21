@@ -32,10 +32,10 @@ def database(path=None, *, write=False):
 
 
 def migrate(path=None):
-    target=path or DB
-    target.parent.mkdir(parents=True,exist_ok=True)
-    with (target.parent/("."+target.name+".migration.lock")).open("a+b") as guard:
-        fcntl.flock(guard,fcntl.LOCK_EX)
+    target = path or DB
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with (target.parent / ("." + target.name + ".migration.lock")).open("a+b") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
         _apply_migrations(target)
 
 

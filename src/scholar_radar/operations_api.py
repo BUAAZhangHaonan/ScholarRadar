@@ -93,10 +93,18 @@ def status():
         else {"services": {}}
     )
     with database() as db:
-        arc=rows(db,"SELECT arc_run_id,result_json FROM arc_handoffs WHERE arc_run_id IS NOT NULL AND result_json IS NOT NULL")
-        receipts={x["arc_run_id"]:json.loads(x["result_json"]).get("cost",{}) for x in arc}
+        arc = rows(
+            db,
+            "SELECT arc_run_id,result_json FROM arc_handoffs WHERE arc_run_id IS NOT NULL AND result_json IS NOT NULL",
+        )
+        receipts = {
+            x["arc_run_id"]: json.loads(x["result_json"]).get("cost", {}) for x in arc
+        }
         return {
-            "arc_usage":{"distinct_runs":len(receipts),"receipts":list(receipts.values())},
+            "arc_usage": {
+                "distinct_runs": len(receipts),
+                "receipts": list(receipts.values()),
+            },
             "services": {
                 k: {
                     "status": v["status"],
@@ -174,5 +182,7 @@ def edit_scope(update: ScopeUpdate):
     with database(write=True) as db:
         return update_scope(db, update.topics, update.arxiv_query)
 
+
 from .case_pages import router as research_examples_router
+
 router.include_router(research_examples_router)

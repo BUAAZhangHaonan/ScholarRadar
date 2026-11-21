@@ -276,7 +276,7 @@ async def archive_run(run):
             _, _, source = metadata(payload)
             if source:
                 objects.append((source, relative))
-    report_kind="daily" if run["kind"]=="research_update" else run["kind"]
+    report_kind = "daily" if run["kind"] == "research_update" else run["kind"]
     out = ROOT / "exports" / run["as_of"] / report_kind
     report_file = out / "internprep.json"
     edition = (
