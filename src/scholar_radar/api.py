@@ -140,3 +140,7 @@ app.include_router(operations_router)
 from .direction_api import router as direction_router
 
 app.include_router(direction_router)
+
+from .prestudy_api import router as prestudy_router
+
+app.include_router(prestudy_router)
