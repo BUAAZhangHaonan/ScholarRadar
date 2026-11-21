@@ -88,20 +88,20 @@ function readingNotes(records) {
   return (
     blocks +
     (sources ? "<div>" + sources + "</div>" : "") +
-    legacy
-      .map(
-        (r) =>
-          '<section id="record-' +
-          esc(r.id) +
-          '"><h2>' +
-          esc(scopeNames[r.focus] || "阅读记录") +
-          "</h2>" +
-          (r.heading ? '<p class="sub">' + esc(r.heading) + "</p>" : "") +
-          prose(r.answer) +
-          citations(r) +
-          "</section>",
-      )
-      .join("")
+    (mapped.length > 1
+      ? '<section class="rule-section"><h2>各次章节研究记录</h2>' +
+        mapped.map((r) => '<details class="source-fold" id="note-' + esc(r.id) +
+          '"><summary>' + esc(r.heading || scopeNames[r.focus] || "研究记录") +
+          '</summary>' + prose(r.answer) + citations(r) + '</details>').join("") + '</section>'
+      : "") +
+    legacy.map((r) => {
+      const title = esc(r.heading || scopeNames[r.focus] || "阅读记录");
+      const body = prose(r.answer) + citations(r);
+      return mapped.length
+        ? '<details class="source-fold" id="note-' + esc(r.id) + '"><summary>' +
+          title + '</summary>' + body + '</details>'
+        : '<section id="record-' + esc(r.id) + '"><h2>' + title + '</h2>' + body + '</section>';
+    }).join("")
   );
 }
 function sourceLinks(work) {
@@ -214,6 +214,13 @@ async function detail(id) {
         '<option value="evaluation">实验与结果</option><option value="method">方法</option><option value="limits">局限与讨论</option></select></label><label>原文章节<select name="heading"><option value="">按问题匹配章节</option></select></label><label>希望核对的比较、证据或条件（可选）<textarea name="question" maxlength="1500"></textarea></label><button>加入补读</button></form></details>'
       : "") +
     "</div>";
+  if (hinted && hinted.revision_id === chosen) {
+    const note = document.getElementById("note-" + hinted.id) || document.getElementById("record-" + hinted.id);
+    if (note) {
+      if (note.tagName === "DETAILS") note.open = true;
+      note.scrollIntoView({block: "start"});
+    }
+  }
   enableActions($("#app"));
   if ($("#paper-version"))
     $("#paper-version").onchange = (e) => {
