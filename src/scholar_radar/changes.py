@@ -81,3 +81,22 @@ def input_versions(db,did):
     return rows(db,"""SELECT kind,entity_id,version FROM direction_changes WHERE rowid IN
            (SELECT max(rowid) FROM direction_changes WHERE direction_id=? GROUP BY kind,entity_id)
            ORDER BY kind,entity_id""",(did,))
+
+
+def research_outcomes(db,did):
+    outcomes=[]
+    for row in db.execute("""SELECT ev.id,ev.decision,ev.reason,ev.actual,ev.at,a.title,s.id snapshot_id
+        FROM action_events ev JOIN actions a ON a.id=ev.action_id JOIN snapshots s ON s.id=a.snapshot_id
+        WHERE s.dir_id=? AND ev.decision='completed' ORDER BY ev.at DESC LIMIT 8""",(did,)):
+        import json
+        outcomes.append({"kind":"user_experiment","id":row["id"],"title":row["title"],"snapshot_id":row["snapshot_id"],
+                         "actual":json.loads(row["actual"]),"reason":row["reason"],"at":row["at"]})
+    for row in db.execute("SELECT id,snapshot_id,focus,result_json,updated_at FROM arc_handoffs WHERE direction_id=? AND status='completed' ORDER BY updated_at DESC LIMIT 6",(did,)):
+        import json
+        result=json.loads(row["result_json"] or "{}")
+        outcomes.append({"kind":"arc_prestudy","id":row["id"],"snapshot_id":row["snapshot_id"],"focus":row["focus"],
+            "finding":result.get("current_understanding"),"next_question":result.get("next_question"),
+            "decision":result.get("research_decision"),"evidence_limited":result.get("evidence_limited"),
+            "sources":[{"id":v["source_id"],"title":v.get("title"),"url":v.get("url"),"level":v.get("reading_level")} for v in result.get("source_directory",[])],
+            "at":row["updated_at"]})
+    return outcomes

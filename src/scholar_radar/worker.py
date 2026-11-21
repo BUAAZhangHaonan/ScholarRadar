@@ -19,8 +19,11 @@ from .review import review
 from .corrections import revise
 from .resources import verify_resources
 from .settings import VAR, now
+from .changes import current_run
+from .prestudy_worker import execute as execute_arc
 
 STAGES = {
+    "arc_stage":execute_arc,
     "discover": collect,
     "official": postings,
     "observe": observe,
@@ -50,6 +53,7 @@ async def execute(run, job, owner):
     from .discovery import active_scope
 
     scope_token = active_scope.set(run["scope"])
+    source_token=current_run.set(run)
     beat = asyncio.create_task(heartbeat(job["id"], owner))
     try:
         if job["stage"] == "discover":
@@ -57,7 +61,7 @@ async def execute(run, job, owner):
         handler = STAGES[job["stage"]]
         detail = await (
             handler(run, json.loads(job["payload"]))
-            if job["stage"] == "read"
+            if job["stage"] in {"read","arc_stage"}
             else handler(run)
         )
         ok = True
@@ -66,6 +70,7 @@ async def execute(run, job, owner):
         ok = False
     finally:
         active_scope.reset(scope_token)
+        current_run.reset(source_token)
         beat.cancel()
         await asyncio.gather(beat, return_exceptions=True)
     with database(write=True) as db:

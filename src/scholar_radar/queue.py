@@ -7,6 +7,7 @@ from .profile import get_profile
 from .settings import dump, now
 
 ORDER = (
+    "arc_stage",
     "discover",
     "official",
     "observe",
@@ -49,7 +50,7 @@ def enqueue(db, kind, day):
     )
     stages = ORDER if kind == "daily" else ("publish", "archive")
     for stage in stages:
-        if stage != "read":
+        if stage not in {"read","arc_stage","complete_batch"}:
             job(db, rid, stage)
     return rid
 

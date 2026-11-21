@@ -248,11 +248,11 @@ async def reading(run, payload):
     with database() as db:
         p = json.loads(
             db.execute(
-                "SELECT paper FROM readings WHERE run_id=? AND work_key=?", (rid, wk)
+                "SELECT paper FROM readings WHERE run_id=? AND work_key=?", (payload.get("origin_run_id",rid), wk)
             ).fetchone()[0]
         )
     if payload.get("focus"):
-        return await read_paper({**p, "evidence_focus": payload["focus"]}, rid)
+        return await read_paper({**p, "evidence_focus": payload["focus"],"target_revision_id":payload["revision_id"],"analysis_question":payload.get("question")}, rid)
     try:
         result = await read_paper(p, rid)
     except Exception as exc:

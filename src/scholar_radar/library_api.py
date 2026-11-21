@@ -126,47 +126,36 @@ def posting_detail(pid: str):
         return {**dict(r), "observations": hist}
 
 
-@router.post("/api/works/{wid}/read-section/{focus}", status_code=202)
-def read_section(wid: str, focus: str):
+from pydantic import BaseModel,Field
+
+
+class SectionRequest(BaseModel):
+    revision_id:str|None=None
+    question:str|None=Field(None,max_length=1500)
+
+
+@router.post("/api/works/{wid}/read-section/{focus}",status_code=202)
+def read_section(wid:str,focus:str,data:SectionRequest|None=None):
     from .queue import job
     from .readings import passage
-
-    if focus not in {"method", "evaluation", "limits"}:
-        raise ValueError("未知章节类型")
+    from .changes import update_run,arrange
+    if focus not in {"method","evaluation","limits"}: raise ValueError("未知章节类型")
+    request=data or SectionRequest()
     with database(write=True) as db:
-        row = db.execute(
-            """SELECT l.run_id,l.work_key,v.id revision_id,v.body FROM readings l JOIN revisions v
-          ON v.id=json_extract(l.outcome,'$.revision_id') WHERE json_extract(l.outcome,'$.work_id')=?
-          AND l.status='done' ORDER BY l.rowid DESC LIMIT 1""",
-            (wid,),
-        ).fetchone()
-        if not row:
-            raise ValueError("当前作品尚无完成的固定版本精读")
-        start, size, heading = passage(row["body"], focus)
-        if not heading:
-            raise ValueError("已解析全文没有匹配的章节标题")
-        existing = db.total_changes
-        jid = job(
-            db,
-            row["run_id"],
-            "read",
-            {"key": row["work_key"], "focus": focus, "revision_id": row["revision_id"]},
-        )
-        reused = db.total_changes == existing
-        if not reused:
-            db.execute(
-                "UPDATE runs SET status='queued',ended_at=NULL WHERE id=?",
-                (row["run_id"],),
-            )
-            db.execute(
-                "UPDATE jobs SET status='queued' WHERE stage='archive' AND run_id=?",
-                (row["run_id"],),
-            )
-        return {
-            "job_id": jid,
-            "run_id": row["run_id"],
-            "heading": heading,
-            "start": start,
-            "end": start + size,
-            "reused": reused,
-        }
+        row=db.execute("""SELECT l.run_id,l.work_key,v.id revision_id,v.body FROM readings l JOIN revisions v
+            ON v.id=json_extract(l.outcome,'$.revision_id') WHERE json_extract(l.outcome,'$.work_id')=?
+            AND l.status='done' AND (? IS NULL OR v.id=?) ORDER BY v.observed_at DESC,l.rowid DESC LIMIT 1""",
+            (wid,request.revision_id,request.revision_id)).fetchone()
+        if not row: raise ValueError("所选论文修订尚无可继续的精读记录")
+        start,size,heading=passage(row["body"],focus)
+        if not heading: raise ValueError("已解析全文没有匹配的章节标题")
+        rid=update_run(db)
+        payload={"key":row["work_key"],"origin_run_id":row["run_id"],"focus":focus,"revision_id":row["revision_id"]}
+        if request.question: payload["question"]=request.question
+        # Reuse a previously queued exact request, including legacy section jobs.
+        past=db.execute("""SELECT id,run_id FROM jobs WHERE stage='read' AND json_extract(payload,'$.focus')=?
+             AND json_extract(payload,'$.revision_id')=? AND coalesce(json_extract(payload,'$.question'),'')=?
+             ORDER BY rowid LIMIT 1""",(focus,row["revision_id"],request.question or "")).fetchone()
+        if past: return {"job_id":past["id"],"run_id":past["run_id"],"heading":heading,"start":start,"end":start+size,"reused":True}
+        jid=job(db,rid,"read",payload);arrange(db,rid,("archive",))
+        return {"job_id":jid,"run_id":rid,"heading":heading,"start":start,"end":start+size,"reused":False}

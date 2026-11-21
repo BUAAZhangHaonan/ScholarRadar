@@ -26,7 +26,7 @@ def selected_bundle(db,did,sid,stage,focus,previous_idea=None):
         sources.append({"external_source_id":e["id"],"title":e["title"] or ("官方岗位详情" if e["kind"]=="job" else "已核验材料"),
             "url":url,"version":e["version"] or e["upstream_revision"],"revision_id":e["revision_id"],
             "work_id":e["work_id"],"evidence_ids":[e["id"]],"access":"passage","content":content,
-            "start_char":start,"total_chars":e["total_chars"],"source_type":"paper" if e["kind"]=="paper" else "web"})
+            "start_char":start,"total_chars":e["total_chars"],"source_type":"paper" if e["kind"]=="paper" else "official_documentation"})
         rs=rows(db,"""SELECT rr.id,rr.question,rr.start,rr.end,c.statement FROM reading_records rr JOIN claims c ON c.id=rr.id
              JOIN claim_evidence ce ON ce.claim_id=rr.id WHERE rr.revision_id=? AND ce.evidence_id=? ORDER BY rr.recorded_at DESC""",
              (e["revision_id"],e["id"]))
