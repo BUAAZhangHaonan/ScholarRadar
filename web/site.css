@@ -259,17 +259,15 @@ summary:focus-visible {
   flex: 1 0 auto;
   padding-block: 30px 54px;
 }
-.foot-inner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  border-top: 1px solid var(--line);
-  padding-block: 15px 24px;
+footer { border-top: 1px solid var(--line); }
+.foot-inner { padding-block: 6px 12px; }
+.utility-links { display: flex; align-items: center; flex-wrap: wrap; gap: 18px; }
+.utility-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--muted);
   font-size: 13px;
-}
-.foot-inner a {
-  color: inherit;
 }
 .lead,
 .page-head {
