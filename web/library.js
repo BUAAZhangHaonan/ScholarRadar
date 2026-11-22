@@ -5,6 +5,7 @@ import {
   empty,
   esc,
   evid,
+  evidenceSet,
   modal,
   msg,
   safeURL,
@@ -38,7 +39,7 @@ function citations(record, label = "这次阅读的原文") {
   return record.evidence_ids?.length
     ? '<details class="source-fold"><summary>' +
         esc(label) +
-        '</summary><div class="row">' +
+        '</summary><div class="row"' + evidenceSet(record.evidence_ids) + '>' +
         record.evidence_ids
           .map((id, i) => evid(id, "引文 " + (i + 1)))
           .join(" ") +

@@ -1008,6 +1008,16 @@ dialog > header {
   gap: 4px 18px;
 }
 .drawer-tools > * { display: inline-flex; align-items: center; min-height: 44px; }
+.citation-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.citation-pager button:disabled { cursor: default; }
 #evidence-drawer .drawer-body {
   padding: 20px 22px 32px;
 }

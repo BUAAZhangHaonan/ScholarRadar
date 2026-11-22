@@ -51,6 +51,8 @@ export const evid = (id, n) =>
   '">' +
   esc(n || "查看引文") +
   "</button>";
+export const evidenceSet = (ids) => ids?.length > 1
+  ? ' data-evidence-set="' + esc(ids.join(" ")) + '"' : "";
 export const list = (items) =>
   '<ul class="list">' +
   items.map((s) => "<li>" + s + "</li>").join("") +
@@ -68,13 +70,7 @@ export function modal(title, html) {
   if (!d.open) d.showModal();
 }
 let citationRequest = 0;
-export async function showEvidence(id) {
-  const ticket = ++citationRequest;
-  const opener = document.activeElement;
-  const scroll = [window.scrollX, window.scrollY];
-  const evidence = await api("/api/evidence/" + encodeURIComponent(id));
-  if (ticket !== citationRequest) return;
-  const drawer = $("#evidence-drawer");
+function renderEvidence(evidence) {
   $("#evidence-title").textContent = evidence.title || "原始材料";
   const contextIds = [];
   function context(text, side) {
@@ -102,16 +98,45 @@ export async function showEvidence(id) {
     toggle.textContent = expanded ? "收起上下文" : "展开上下文";
     for (const id of contextIds) document.getElementById(id).hidden = !expanded;
   };
-  drawer.addEventListener(
-    "close",
-    () => {
-      if (opener?.isConnected) opener.focus({ preventScroll: true });
-      window.scrollTo(...scroll);
-    },
-    { once: true },
-  );
+}
+
+export async function showEvidence(id, related = [], opener = document.activeElement) {
+  const ids = related.includes(id) ? [...new Set(related)] : [id];
+  const drawer = $("#evidence-drawer");
+  const scroll = [window.scrollX, window.scrollY];
+  async function select(index, step = 0) {
+    const ticket = ++citationRequest;
+    const evidence = await api("/api/evidence/" + encodeURIComponent(ids[index]));
+    if (ticket !== citationRequest) return false;
+    renderEvidence(evidence);
+    if (ids.length > 1) {
+      const pager = document.createElement("nav");
+      pager.className = "citation-pager";
+      pager.setAttribute("aria-label", "本次阅读的引文");
+      pager.innerHTML = '<button type="button" class="quiet" aria-label="上一条引文">上一条</button>' +
+        '<span class="sub" role="status">引文 ' + (index + 1) + ' / ' + ids.length + '</span>' +
+        '<button type="button" class="quiet" aria-label="下一条引文">下一条</button>';
+      $("#evidence-body").append(pager);
+      const [prev, next] = pager.querySelectorAll("button");
+      prev.disabled = index === 0;
+      next.disabled = index === ids.length - 1;
+      prev.onclick = () => select(index - 1, -1).catch(err => msg(err.message));
+      next.onclick = () => select(index + 1, 1).catch(err => msg(err.message));
+      if (step) {
+        const preferred = step < 0 ? prev : next;
+        (preferred.disabled ? (step < 0 ? next : prev) : preferred).focus({ preventScroll: true });
+      }
+    }
+    drawer.scrollTop = 0;
+    return true;
+  }
+  if (!await select(ids.indexOf(id))) return;
+  drawer.addEventListener("close", () => {
+    ++citationRequest;
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
+    window.scrollTo(...scroll);
+  }, { once: true });
   if (!drawer.open) drawer.showModal();
-  drawer.scrollTop = 0;
 }
 export const reqid = () =>
   globalThis.crypto?.randomUUID?.() ||

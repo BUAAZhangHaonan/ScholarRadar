@@ -1,4 +1,4 @@
-import { api, esc, evid, msg, reqid, safeURL, send } from "./common.js";
+import { api, esc, evid, evidenceSet, msg, reqid, safeURL, send } from "./common.js";
 
 export const pathFor = (section, id) =>
   "/" + section + "/" + encodeURIComponent(id);
@@ -125,7 +125,7 @@ export function materialList(items, withQuotes = true) {
     items
       .map(
         (m) =>
-          "<li>" +
+          "<li" + evidenceSet(m.citations) + ">" +
           materialLink(m) +
           (withQuotes && m.citations?.length
             ? "　" + evid(m.citations[0], "读引文")

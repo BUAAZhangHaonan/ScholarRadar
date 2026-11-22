@@ -1,4 +1,4 @@
-import { $, api, empty, esc, evid } from "./common.js";
+import { $, api, empty, esc, evid, evidenceSet } from "./common.js";
 import {
   acceptControl,
   enableActions,
@@ -73,7 +73,7 @@ function featuredPaper(paper) {
   return '<article class="feature-story report-feature">' +
     featureHeading("重点阅读", paper.title, paper.version) +
     '<div class="feature-content">' + prose(shortFinding(paper.body)) +
-    '<div class="story-actions"><a class="button" href="' + paperUpdateUrl(paper) +
+    '<div class="story-actions"' + evidenceSet(paper.evidence_ids) + '><a class="button" href="' + paperUpdateUrl(paper) +
     '">阅读研究记录</a>' + (quote ? evid(quote, "核对原文") : "") +
     '</div></div></article>';
 }

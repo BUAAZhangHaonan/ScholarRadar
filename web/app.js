@@ -34,7 +34,10 @@ $("#close").onclick = () => $("#detail").close();
 $("#evidence-close").onclick = () => $("#evidence-drawer").close();
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-evidence]");
-  if (b) showEvidence(b.dataset.evidence).catch((x) => msg(x.message));
+  if (b) {
+    const ids = b.closest("[data-evidence-set]")?.dataset.evidenceSet.split(" ") || [];
+    showEvidence(b.dataset.evidence, ids, b).catch((x) => msg(x.message));
+  }
 });
 
 function expansionState() {
