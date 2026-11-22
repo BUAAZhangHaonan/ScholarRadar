@@ -987,6 +987,27 @@ dialog > header {
   display: grid;
   gap: 9px;
 }
+#evidence-drawer > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+#evidence-title { line-height: 1.55; }
+#evidence-close { white-space: nowrap; }
+#evidence-drawer .quote {
+  margin-block: 12px;
+  padding: 16px;
+  font-size: 16px;
+  line-height: 1.75;
+}
+.evidence-context:not([hidden]) { margin-block: 14px; }
+.drawer-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+.drawer-tools > * { display: inline-flex; align-items: center; min-height: 44px; }
 #evidence-drawer .drawer-body {
   padding: 20px 22px 32px;
 }

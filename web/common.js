@@ -76,22 +76,32 @@ export async function showEvidence(id) {
   if (ticket !== citationRequest) return;
   const drawer = $("#evidence-drawer");
   $("#evidence-title").textContent = evidence.title || "原始材料";
+  const contextIds = [];
+  function context(text, side) {
+    if (!text?.trim()) return "";
+    const id = 'quote-' + side;
+    contextIds.push(id);
+    return '<div id="' + id + '" class="evidence-context context" hidden>' + esc(text) + '</div>';
+  }
+  const before = context(evidence.before, "before"), after = context(evidence.after, "after");
+  const line = Number.isInteger(evidence.line_start)
+    ? "第 " + evidence.line_start + (evidence.line_end > evidence.line_start ? "–" + evidence.line_end : "") + " 行"
+    : "";
+  const where = [evidence.version, line].filter(Boolean).join(" · ");
   $("#evidence-body").innerHTML =
-    '<p class="sub">' +
-    esc(evidence.version || "") +
-    "</p>" +
-    '<div class="context">' +
-    esc(evidence.before) +
-    "</div>" +
-    '<blockquote class="quote">' +
-    esc(evidence.quote) +
-    "</blockquote>" +
-    '<div class="context">' +
-    esc(evidence.after) +
-    "</div>" +
-    '<p class="story-actions"><a target="_blank" rel="noopener" href="' +
-    safeURL(evidence.url) +
-    '">打开原始来源 ↗</a></p>';
+    (where ? '<p class="sub">' + esc(where) + '</p>' : "") + before +
+    '<blockquote class="quote">' + esc(evidence.quote) + '</blockquote>' + after +
+    '<div class="drawer-tools">' +
+    (contextIds.length ? '<button type="button" class="link" id="toggle-context" aria-expanded="false" aria-controls="' +
+      contextIds.join(" ") + '">展开上下文</button>' : "") +
+    '<a target="_blank" rel="noopener" href="' + safeURL(evidence.url) + '">打开原始来源 ↗</a></div>';
+  const toggle = $("#toggle-context");
+  if (toggle) toggle.onclick = () => {
+    const expanded = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.textContent = expanded ? "收起上下文" : "展开上下文";
+    for (const id of contextIds) document.getElementById(id).hidden = !expanded;
+  };
   drawer.addEventListener(
     "close",
     () => {
