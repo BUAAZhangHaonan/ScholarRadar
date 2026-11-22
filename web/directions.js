@@ -225,6 +225,32 @@ function options(values, current) {
     )
     .join("");
 }
+function directionCard(d, reviewed) {
+  const url = localUrl(d.id);
+  const follow = followControl(d.id, d.followed, d.latest_snapshot_id);
+  const title = '<p class="eyeline">' + esc(layers[d.layer] || "研究方向") +
+    '</p><h3><a href="' + url + '">' + esc(d.title) + '</a></h3>';
+  if (!reviewed) {
+    return '<article class="direction-card direction-watch"><div>' + title +
+      prose(d.question !== d.title ? d.question : d.method) +
+      '</div><div class="watch-action">' + follow + '</div></article>';
+  }
+  const change = d.latest_change && d.latest_change !== d.latest_judgment ? prose(d.latest_change) : "";
+  const fit = d.personal_fit_summary ? prose(d.personal_fit_summary) : "";
+  return '<article class="card direction-card direction-reviewed">' + title +
+    '<div class="story-body">' + prose(d.latest_judgment) + change +
+    (d.next_action ? '<div class="story-next"><strong class="label">下一步</strong>' +
+      prose(d.next_action) + '</div>' : "") +
+    (fit && d.next_action ? '<details class="direction-fit"><summary>个人切入点</summary>' +
+      fit + '</details>' : fit) + '</div>' +
+    '<div class="story-actions"><a class="button" href="' + url + '">打开方向</a>' + follow + '</div></article>';
+}
+function directionGroup(title, data, reviewed) {
+  if (!data.length) return "";
+  return '<section class="direction-group"><h2 class="section-title">' + title +
+    '</h2><div class="' + (reviewed ? 'reviewed-directions' : 'watch-directions') + '">' +
+    data.map(d => directionCard(d, reviewed)).join("") + '</div></section>';
+}
 async function listDirections() {
   const here = new URL(location.href),
     layer = here.searchParams.get("layer") || "",
@@ -261,37 +287,10 @@ async function listDirections() {
       state,
     ) +
     "</select></label></form></header>" +
-    '<div class="grid">' +
-    (data
-      .map(
-        (d) =>
-          '<article class="card direction-card"><p class="eyeline">' +
-          esc(layers[d.layer] || "研究方向") +
-          (d.followed ? " · 已关注" : "") +
-          '</p><h2><a href="' +
-          localUrl(d.id) +
-          '">' +
-          esc(d.title) +
-          '</a></h2><div class="story-body">' +
-          prose(
-            d.latest_judgment ||
-              (d.question !== d.title ? d.question : d.method),
-          ) +
-          (d.latest_change && d.latest_change !== d.latest_judgment
-            ? prose(d.latest_change)
-            : "") +
-          (d.personal_fit_summary ? prose(d.personal_fit_summary) : "") +
-          (d.next_action
-            ? '<div class="story-next">' + prose(d.next_action) + "</div>"
-            : "") +
-          '</div><div class="story-actions"><a class="button quiet" href="' +
-          localUrl(d.id) +
-          '">打开方向</a>' +
-          followControl(d.id, d.followed, d.latest_snapshot_id) +
-          "</div></article>",
-      )
-      .join("") || empty("没有符合筛选条件的方向。")) +
-    "</div>";
+    (data.length ? '<div class="flow direction-board">' +
+      directionGroup("已有研究判断", data.filter(d => d.latest_judgment), true) +
+      directionGroup("持续观察", data.filter(d => !d.latest_judgment), false) +
+      '</div>' : empty("没有符合筛选条件的方向。"));
   $("#filters").onchange = (e) => {
     const form = new FormData(e.currentTarget);
     const q = new URLSearchParams();

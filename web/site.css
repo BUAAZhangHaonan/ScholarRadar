@@ -828,23 +828,48 @@ dialog > header {
   padding-block: 15px;
 }
 .literature-list h3 a,
-.direction-card h2 a {
+.direction-card h3 a {
   color: var(--ink);
   text-decoration: none;
 }
 .literature-list h3 a:hover,
-.direction-card h2 a:hover {
+.direction-card h3 a:hover {
   color: var(--green);
   text-decoration: underline;
 }
 .literature-list .sub {
   margin-top: 3px;
 }
+.reviewed-directions { display: grid; gap: 16px; }
+.direction-card h3 {
+  font-size: 20px;
+  line-height: 30px;
+}
+.direction-reviewed {
+  border-top: 3px solid var(--green);
+}
+.direction-reviewed .story-body { margin-top: 12px; }
+.direction-reviewed .story-next strong { display: block; margin-bottom: 3px; }
+.direction-fit summary { min-height: 44px; align-content: center; }
+.direction-fit[open] { padding-bottom: 6px; }
+.watch-directions { border-top: 1px solid var(--line); }
+.direction-watch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 24px;
+  padding-block: 17px;
+  border-bottom: 1px solid var(--line);
+}
+.direction-watch .eyeline { margin-bottom: 3px; }
+.direction-watch .prose { color: var(--muted); margin-top: 4px; }
+.direction-watch a { display: inline-block; padding-block: 4px; }
+@media (max-width: 480px) {
+  .direction-watch { grid-template-columns: minmax(0, 1fr); }
+  .direction-watch h3 a { min-height: 44px; align-content: center; }
+}
 .direction-card > .eyeline {
   margin: 0 0 7px;
-}
-.direction-card > .story-body {
-  margin-top: 0;
 }
 .direction-card .prose p {
   line-height: 26px;
