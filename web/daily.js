@@ -209,7 +209,7 @@ export async function render() {
         : "每月研究复盘";
   document.title = heading + " · ScholarRadar";
   const controls =
-    '<div class="section-tools"><div class="periods" aria-label="报告周期">' +
+    '<div class="section-tools edition-controls"><nav class="periods" aria-label="报告周期">' +
     Object.entries(periods)
       .map(
         ([v, n]) =>
@@ -222,7 +222,7 @@ export async function render() {
           "</a>",
       )
       .join("") +
-    '</div><label class="compact-date">报告日期<input id="period-date" type="date" value="' +
+    '</nav><label class="compact-date"><span class="date-label">报告日期</span><input id="period-date" type="date" value="' +
     esc(selectedDate || report.date || "") +
     '"></label></div>';
   const headline = report.summary
@@ -290,11 +290,7 @@ export async function render() {
         "</div></section>"
       : "";
   $("#app").innerHTML =
-    '<header class="page-head"><div><h1>' +
-    heading +
-    "</h1>" +
-    (report.date ? '<p class="sub">' + esc(report.date) + "</p>" : "") +
-    "</div>" +
+    '<header class="page-head edition-head"><h1>' + heading + "</h1>" +
     controls +
     '</header><div class="flow">' +
     headline +

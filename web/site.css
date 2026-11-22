@@ -518,14 +518,16 @@ details > summary + * {
 }
 .periods {
   display: inline-flex;
-  background: #e9eee7;
+  background: var(--soft);
   border-radius: 7px;
   padding: 3px;
   gap: 2px;
 }
 .periods a {
-  min-height: 32px;
-  padding: 4px 12px;
+  min-height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  padding: 5px 12px;
   color: var(--muted);
   border-radius: 5px;
   text-decoration: none;
@@ -700,8 +702,10 @@ dialog > header {
   align-items: center;
 }
 .compact-date input {
-  max-width: 160px;
+  width: 9rem;
+  font-variant-numeric: tabular-nums;
 }
+.edition-controls { justify-content: flex-start; gap: 12px; }
 .source-fold,
 .stage-history,
 .feedback,
@@ -809,11 +813,21 @@ dialog > header {
     width: 100%;
     justify-content: flex-start;
   }
-  .compact-date {
-    gap: 4px;
+  .edition-head { row-gap: 14px; }
+  .edition-head .edition-controls { gap: 8px; }
+  .edition-controls .periods a { padding-inline: 8px; }
+  .compact-date { position: relative; }
+  .compact-date .date-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+    overflow: hidden;
+    white-space: nowrap;
   }
   .compact-date input {
-    padding: 5px 8px;
+    width: 8rem;
+    padding: 6px 8px;
   }
   .prior-stage,
   .research-form {
