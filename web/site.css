@@ -888,6 +888,38 @@ dialog > header {
   .reading-outline ul { padding-bottom: 10px; }
   .reading-outline summary, .reading-outline a { min-height: 44px; }
 }
+.catalogue-tools {
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 20rem) auto;
+  align-items: end;
+  gap: 12px;
+}
+.catalogue-query input { width: 100%; }
+.paper-catalogue > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 28px;
+  align-items: baseline;
+}
+.paper-catalogue h3 a { display: inline-block; }
+.paper-catalogue .sub { text-align: end; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) {
+  .catalogue-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "title kind" "query submit";
+    align-items: end;
+    gap: 12px;
+  }
+  .catalogue-head h1 { grid-area: title; align-self: center; }
+  .catalogue-tools { display: contents; }
+  .catalogue-kind { grid-area: kind; }
+  .catalogue-query { grid-area: query; }
+  .catalogue-tools button { grid-area: submit; }
+  .paper-catalogue > li { grid-template-columns: minmax(0, 1fr); }
+  .paper-catalogue .sub { text-align: start; }
+  .paper-catalogue h3 a { min-height: 44px; align-content: center; }
+}
 .literature-list > li {
   padding-block: 15px;
 }

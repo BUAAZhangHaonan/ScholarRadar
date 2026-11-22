@@ -341,8 +341,8 @@ async function library() {
   const urlAt = (n) =>
     "/library?" + new URLSearchParams({ kind, q, offset: n });
   $("#app").innerHTML =
-    '<header class="page-head"><h1>文献</h1><form id="library-filter" class="controls">' +
-    '<label>材料类型<select name="kind">' +
+    '<header class="page-head catalogue-head"><h1>文献</h1><form id="library-filter" class="catalogue-tools" role="search" aria-label="检索文献与材料">' +
+    '<label class="catalogue-kind">材料类型<select name="kind">' +
     Object.entries(kinds)
       .map(
         ([k, v]) =>
@@ -355,11 +355,11 @@ async function library() {
           "</option>",
       )
       .join("") +
-    '</select></label><label>搜索<input name="q" type="search" value="' +
+    '</select></label><label class="catalogue-query">搜索<input name="q" type="search" value="' +
     esc(q) +
     '" placeholder="题名或原文关键词" maxlength="200"></label><button>查找</button></form></header>' +
     (result.length
-      ? '<ul class="list literature-list">' +
+      ? '<ul class="list literature-list' + (kind === "paper" ? " paper-catalogue" : "") + '">' +
         result
           .map(
             (item) =>
@@ -400,7 +400,9 @@ async function library() {
           )
           .join("") +
         "</ul>"
-      : empty("没有找到符合条件的材料。")) +
+      : empty("没有找到符合条件的材料。") + (q ?
+        '<a class="text-action" href="/library?' + esc(new URLSearchParams({ kind }).toString()) +
+        '">清除关键词</a>' : "")) +
     '<div class="story-actions">' +
     (offset
       ? '<a class="button quiet" href="' +
