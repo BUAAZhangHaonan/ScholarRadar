@@ -824,6 +824,62 @@ dialog > header {
   font-size: 0.9em;
   overflow-wrap: anywhere;
 }
+.reader-spread {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, 21%);
+  grid-template-areas: "article contents";
+  align-items: start;
+  gap: clamp(28px, 5vw, 76px);
+}
+.reader-column { grid-area: article; min-width: 0; }
+.reader-column [data-reading-part]:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+}
+.reading-outline {
+  grid-area: contents;
+  position: sticky;
+  top: calc(var(--mast-height) + 22px);
+  max-height: calc(100dvh - var(--mast-height) - 44px);
+  overflow: auto;
+  border-inline-start: 1px solid var(--line);
+  padding-inline-start: 16px;
+}
+.reading-outline summary,
+.reading-outline a { min-height: 34px; align-content: center; }
+.reading-outline summary { color: var(--ink); font-size: 14px; font-weight: 650; }
+.reading-outline ul { list-style: none; padding: 0; }
+.reading-outline li + li { margin-top: 2px; }
+.reading-outline a {
+  display: block;
+  padding: 5px 10px;
+  border-inline-start: 2px solid transparent;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 21px;
+}
+.reading-outline a:hover { color: var(--green); text-decoration: underline; }
+.reading-outline a[aria-current="location"] {
+  background: var(--soft);
+  border-color: var(--green);
+  color: var(--deep);
+  font-weight: 600;
+}
+@media (max-width: 979px) {
+  .reader-spread { grid-template-columns: minmax(0, 1fr); grid-template-areas: "contents" "article"; gap: 18px; }
+  .reading-outline {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 0 12px;
+    background: var(--soft);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .reading-outline ul { padding-bottom: 10px; }
+  .reading-outline summary, .reading-outline a { min-height: 44px; }
+}
 .literature-list > li {
   padding-block: 15px;
 }

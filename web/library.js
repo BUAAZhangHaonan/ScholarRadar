@@ -1,3 +1,4 @@
+import { mountReadingOutline } from "./outline.js";
 import {
   $,
   api,
@@ -66,7 +67,7 @@ function readingNotes(records) {
         '<section id="record-' +
         esc(r.id) +
         (first ? "" : "-" + key) +
-        '"><h2>' +
+        '"><h2 data-reading-part="' + key + '">' +
         title +
         "</h2>" +
         prose(r.sections[key]) +
@@ -89,7 +90,7 @@ function readingNotes(records) {
     blocks +
     (sources ? "<div>" + sources + "</div>" : "") +
     (mapped.length > 1
-      ? '<section class="rule-section"><h2>各次章节研究记录</h2>' +
+      ? '<section class="rule-section"><h2 data-reading-part="notes">各次章节研究记录</h2>' +
         mapped.map((r) => '<details class="source-fold" id="note-' + esc(r.id) +
           '"><summary>' + esc(r.heading || scopeNames[r.focus] || "研究记录") +
           '</summary>' + prose(r.answer) + citations(r) + '</details>').join("") + '</section>'
@@ -100,14 +101,14 @@ function readingNotes(records) {
       return mapped.length
         ? '<details class="source-fold" id="note-' + esc(r.id) + '"><summary>' +
           title + '</summary>' + body + '</details>'
-        : '<section id="record-' + esc(r.id) + '"><h2>' + title + '</h2>' + body + '</section>';
+        : '<section id="record-' + esc(r.id) + '"><h2 data-reading-part="record">' + title + '</h2>' + body + '</section>';
     }).join("")
   );
 }
 function sourceLinks(work) {
   if (!work.resources.length) return "";
   return (
-    '<details class="rule-section source-fold"><summary>论文提及的代码、模型与数据</summary><ul class="list">' +
+    '<details class="rule-section source-fold"><summary data-reading-part="resources">论文提及的代码、模型与数据</summary><ul class="list">' +
     work.resources
       .map(
         (r) =>
@@ -177,12 +178,12 @@ async function detail(id) {
     '<div class="flow paper-reading">' +
     (records.length
       ? readingNotes(records)
-      : "<section><h2>摘要</h2>" +
+      : '<section><h2 data-reading-part="abstract">摘要</h2>' +
         (prose(work.abstract) ||
           empty("这篇论文已进入文献库，尚无阅读记录。")) +
         "</section>") +
     (work.directions.length
-      ? '<section class="rule-section"><h2>与当前方向的关系</h2><ul class="list">' +
+      ? '<section class="rule-section"><h2 data-reading-part="connections">与当前方向的关系</h2><ul class="list">' +
         work.directions
           .map(
             (d) =>
@@ -210,10 +211,11 @@ async function detail(id) {
       current.searchParams.get("recommendation"),
     ) +
     (records.length
-      ? '<details class="rule-section" id="follow-up-reading"><summary>继续补读</summary><form id="section-read" class="form"><label>想核对的内容<select name="focus">' +
+      ? '<details class="rule-section" id="follow-up-reading"><summary data-reading-part="followup">继续补读</summary><form id="section-read" class="form"><label>想核对的内容<select name="focus">' +
         '<option value="evaluation">实验与结果</option><option value="method">方法</option><option value="limits">局限与讨论</option></select></label><label>原文章节<select name="heading"><option value="">按问题匹配章节</option></select></label><label>希望核对的比较、证据或条件（可选）<textarea name="question" maxlength="1500"></textarea></label><button>加入补读</button></form></details>'
       : "") +
     "</div>";
+  mountReadingOutline($(".paper-reading"), "paper");
   if (hinted && hinted.revision_id === chosen) {
     const note = document.getElementById("note-" + hinted.id) || document.getElementById("record-" + hinted.id);
     if (note) {
