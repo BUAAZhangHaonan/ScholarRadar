@@ -37,17 +37,21 @@ function paperUpdateUrl(item) {
         encodeURIComponent(item.record_id)
     : base;
 }
+function featureHeading(kind, title, version) {
+  return '<header class="feature-heading"><p class="feature-kind">' + esc(kind) +
+    (version ? '<span class="feature-version">' + esc(version) + '</span>' : '') +
+    '</p><h2>' + esc(title) + '</h2></header>';
+}
 function mainStory(item) {
   const target = directionLink(item.direction_id, item.snapshot_id);
   return (
-    '<article class="feature-story"><div class="eyeline">重点变化</div><h2>' +
-    esc(item.title) +
-    "</h2>" +
-    '<div class="story-body">' +
+    '<article class="feature-story report-feature">' +
+    featureHeading("重点变化", item.title) +
+    '<div class="feature-content"><div class="story-body">' +
     prose(item.change) +
     prose(item.personal_fit) +
     (item.next_step
-      ? '<div class="story-next"><p>' + esc(item.next_step) + "</p></div>"
+      ? '<div class="story-next"><strong class="label">下一步</strong><p>' + esc(item.next_step) + "</p></div>"
       : "") +
     '</div><div class="story-actions"><a class="button" href="' +
     target +
@@ -60,11 +64,18 @@ function mainStory(item) {
     "</div>" +
     (item.materials?.length
       ? '<details class="source-fold"><summary>关键材料</summary>' +
-        materialList(item.materials) +
-        "</details>"
-      : "") +
-    "</article>"
+        materialList(item.materials) + "</details>" : "") +
+    "</div></article>"
   );
+}
+function featuredPaper(paper) {
+  const quote = paper.evidence_ids?.[0];
+  return '<article class="feature-story report-feature">' +
+    featureHeading("重点阅读", paper.title, paper.version) +
+    '<div class="feature-content">' + prose(shortFinding(paper.body)) +
+    '<div class="story-actions"><a class="button" href="' + paperUpdateUrl(paper) +
+    '">阅读研究记录</a>' + (quote ? evid(quote, "核对原文") : "") +
+    '</div></div></article>';
 }
 function restStory(item) {
   return (
@@ -226,7 +237,7 @@ export async function render() {
     esc(selectedDate || report.date || "") +
     '"></label></div>';
   const headline = report.summary
-    ? '<section class="reading"><h2 class="section-title">本期判断</h2>' +
+    ? '<section class="reading edition-summary"><h2 class="section-title">本期判断</h2>' +
       prose(report.summary) +
       "</section>"
     : "";
@@ -262,15 +273,7 @@ export async function render() {
         .join("") +
       "</ul></section>"
     : "";
-  const solo = standalone
-    ? '<article class="feature-story"><div class="eyeline">重点阅读</div><h2>' +
-      esc(standalone.title) +
-      "</h2>" +
-      prose(shortFinding(standalone.body)) +
-      '<div class="story-actions"><a class="button" href="' +
-      paperUpdateUrl(standalone) +
-      '">阅读研究记录</a></div></article>'
-    : "";
+  const solo = standalone ? featuredPaper(standalone) : "";
   const none =
     !lead && !standalone && !updates.length
       ? '<section class="panel">' +
