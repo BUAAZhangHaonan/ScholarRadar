@@ -103,6 +103,10 @@ systemctl --user restart scholar-radar-worker.service
 
 `GET /api/exports/internprep` 返回版本化 JSON。每个实际报告还写入 `exports/YYYY-MM-DD/{daily,weekly,monthly}/internprep.json` 和同目录 `report.md`。消费者按 `snapshot_id`、`direction_id` 与行动 ID 去重。历史版本留在 `report_versions` 和 NAS。`GET /api/replay?cutoff=...` 使用带时区的截止时间回放当时已有的材料和判断。`GET /api/evaluation` 查看已到期或待观察的前向评价。正式对接与写回在 InternPrepPipeline 侧单独实施。
 
+## 前端设计
+
+阅读界面使用原生 HTML、CSS 与 JavaScript。本项目的 Codex 设计技能安装在 `.agents/skills/design-taste-frontend/`，对应 [taste-skill 2.5.1](https://github.com/Leonxlnx/taste-skill/tree/f6b76575f949707b4e3c37cd86cb44b0b98643e8/skills/taste-skill)。
+
 ## 验证
 
 ```bash
