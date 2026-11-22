@@ -168,9 +168,7 @@ summary:focus-visible {
   border-bottom: 1px solid var(--line);
   background: var(--card);
 }
-.mast-inner,
-.shell,
-.foot-inner {
+.wrap {
   width: 100%;
   max-width: var(--frame);
   margin-inline: auto;

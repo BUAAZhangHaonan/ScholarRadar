@@ -90,7 +90,7 @@ def case_page(slug: str):
         "<title>"
         + text(title)
         + ' · ScholarRadar</title><link rel="stylesheet" href="/static/site.css">'
-        '<main class="shell"><a href="/">返回研究动态</a><article class="reading"><h1>'
+        '<main class="wrap shell"><a href="/">返回研究动态</a><article class="reading"><h1>'
         + text(title)
         + "</h1><p>"
         + text(intro)
