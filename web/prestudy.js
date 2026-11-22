@@ -138,7 +138,7 @@ function sourceList(task) {
       ? '<p class="sub">' + esc(task.unresolved_cited_source_ids.length) + ' 条引用尚待对应到原始来源。</p>'
       : "") +
     (used.length
-      ? '<section class="source-fold"><h3>正文引用</h3>' +
+      ? '<section class="source-fold"><h3 data-reading-part="sources">正文引用</h3>' +
         listing(used) +
         "</section>"
       : "") +
@@ -229,17 +229,21 @@ export function presentation(task, { showFocus = true } = {}) {
     seen.add(text);
     return originalText(text, sources);
   }
-  const candidates = (p.candidates || [])
+  const stages = p.candidates || [];
+  const partName = task.stage === "run" ? "前提分析" : "研究方案";
+  const candidates = stages
     .map(
-      (c) =>
-        '<section class="stage-text">' +
+      (c, index) =>
+        '<section class="stage-text" data-reading-part="proposal" data-reading-label="' +
+        esc(stages.length === 1 ? partName : c.presentation_title || partName + " " + (index + 1)) + '">' +
         (c.presentation_title
           ? "<h3>" + esc(c.presentation_title) + "</h3>"
           : "") +
         once(c.text) +
         (c.technical_analysis
-          ? "<details><summary>技术分析</summary>" +
-            once(c.technical_analysis) +
+          ? '<details><summary data-reading-part="technical" data-reading-label="' +
+            esc(stages.length > 1 ? "技术分析 · " + (c.presentation_title || partName + " " + (index + 1)) : "技术分析") +
+            '">技术分析</summary>' + once(c.technical_analysis) +
             "</details>"
           : "") +
         "</section>",
@@ -248,12 +252,14 @@ export function presentation(task, { showFocus = true } = {}) {
   const polished = Boolean(
     p.overview || p.stage_summary || p.candidates?.some((c) => c.text),
   );
+  const opening = once(p.stage_summary) + once(p.overview);
   const raw = polished
-    ? once(p.stage_summary) + once(p.overview) + candidates
+    ? (opening ? '<section class="stage-opening" data-reading-part="overview" data-reading-label="阶段结论">' +
+        opening + '</section>' : "") + candidates
     : draftBody(task)
       ? (task.polish_failure
           ? '<p class="sub">研究阶段已完成，中文成文未完成。</p>'
-          : "") + "<h3>研究原稿</h3>" + once(draftBody(task))
+          : "") + '<h3 data-reading-part="draft">研究原稿</h3>' + once(draftBody(task))
       : "";
   return (
     '<div class="stage-result">' +
@@ -267,12 +273,13 @@ export function presentation(task, { showFocus = true } = {}) {
           : task.error || "本阶段还没有可阅读的正文。",
       )) +
     (p.technical_analysis
-      ? "<details><summary>技术分析</summary>" +
-        once(p.technical_analysis) +
+      ? '<details><summary data-reading-part="stage-technical" data-reading-label="' +
+        (stages.some(c => c.technical_analysis) ? "阶段技术分析" : "技术分析") +
+        '">技术分析</summary>' + once(p.technical_analysis) +
         "</details>"
       : "") +
     (task.next_question
-      ? "<h3>下一步要明确的问题</h3>" + once(task.next_question)
+      ? '<h3 data-reading-part="question">下一步要明确的问题</h3>' + once(task.next_question)
       : "") +
     sourceList(task) +
     "</div>"

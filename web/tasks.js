@@ -1,3 +1,4 @@
+import { mountReadingOutline } from "./outline.js";
 import { $, api, empty, esc, heading, msg, send } from "./common.js";
 import { humanDate, pathFor } from "./reader.js";
 import { isActive, presentation, stageName, stageStatus } from "./prestudy.js";
@@ -26,17 +27,14 @@ async function detail(id) {
         humanDate(task.updated_at || task.created_at),
       ].join(" · "),
     ) +
-    "</p></div></header>" +
-    '<div class="flow"><div><a href="' +
-    original(task) +
-    '">回到' +
-    esc(task.direction_title || "原方向") +
-    "</a></div>" +
+    '</p><a class="origin-link" href="' + original(task) + '">回到' +
+    esc(task.direction_title || "原方向") + '</a></div></header><div class="flow">' +
     presentation(task, { showFocus: false }) +
     (["connection_unknown", "paused_external"].includes(task.status)
       ? '<p><button id="resume-task">恢复原任务</button></p>'
       : "") +
     "</div>";
+  mountReadingOutline($(".stage-result"), "arc");
   if ($("#resume-task"))
     $("#resume-task").onclick = async (e) => {
       const b = e.currentTarget;

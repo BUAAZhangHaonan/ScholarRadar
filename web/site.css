@@ -824,6 +824,14 @@ dialog > header {
   font-size: 0.9em;
   overflow-wrap: anywhere;
 }
+.origin-link { display: inline-block; padding-block: 5px; margin-top: 5px; font-size: 14px; }
+.stage-opening .prose + .prose { margin-top: 14px; }
+.stage-text > details {
+  border-block-start: 1px solid var(--line);
+  padding-top: 6px;
+  margin-top: 16px;
+}
+.stage-text > details > summary { min-height: 44px; align-content: center; font-weight: 600; }
 .reader-spread {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(170px, 21%);
