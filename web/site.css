@@ -2,19 +2,22 @@
   font-family:
     Inter, "Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei",
     sans-serif;
-  color: #1c2f28;
-  background: #f6f7f3;
-  --ink: #1c2f28;
-  --muted: #526358;
-  --green: #176244;
-  --deep: #183d30;
-  --line: #cfd9ce;
-  --soft: #e8efe5;
-  --card: #fffefa;
+  color: var(--ink);
+  background: var(--canvas);
+  --canvas: #f6f6f0;
+  --card: #fffef9;
+  --ink: #182b27;
+  --muted: #53645d;
+  --green: #146149;
+  --deep: #153d33;
+  --line: #cbd3c9;
+  --line-strong: #93a399;
+  --soft: #e7eee3;
+  --focus: #a95b14;
   --frame: 1120px;
   --gutter: 24px;
   --pad: 24px;
-  --measure: 46em;
+  --measure: 44em;
   font-size: 16px;
   line-height: 1.75;
   letter-spacing: normal;
@@ -25,6 +28,10 @@
 body {
   margin: 0;
   min-width: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 h1,
 h2,
@@ -46,7 +53,7 @@ h3 {
 h1 {
   font-size: 28px;
   line-height: 36px;
-  font-weight: 600;
+  font-weight: 680;
 }
 h2 {
   font-size: 20px;
@@ -81,8 +88,9 @@ a.button {
   justify-content: center;
   cursor: pointer;
   line-height: 1.45;
-  min-height: 38px;
-  padding: 7px 14px;
+  min-height: 44px;
+  padding: 8px 16px;
+  font-weight: 600;
   border-radius: 6px;
   border: 1px solid var(--green);
   color: #fff;
@@ -91,9 +99,21 @@ a.button {
   text-align: center;
   overflow-wrap: anywhere;
 }
-button:hover,
-a.button:hover {
-  filter: brightness(0.94);
+@media (hover: hover) and (pointer: fine) {
+  button:not(:disabled):hover,
+  a.button:hover {
+    filter: brightness(0.95);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a.button {
+    transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+  }
+  button:not(:disabled):active,
+  a.button:active {
+    transform: translateY(1px);
+  }
 }
 button:disabled {
   opacity: 0.62;
@@ -114,6 +134,7 @@ a.text-action {
   min-height: 30px;
   padding: 1px 0;
   text-align: left;
+  font-weight: inherit;
   justify-content: flex-start;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -124,7 +145,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible {
-  outline: 3px solid #c48126;
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 .mast {
@@ -193,6 +214,7 @@ nav a[aria-current] {
   color: var(--deep);
 }
 .shell {
+  flex: 1 0 auto;
   padding-block: 30px 54px;
 }
 .foot-inner {
@@ -407,9 +429,13 @@ select,
 textarea {
   background: var(--card);
   color: var(--ink);
-  border: 1px solid #aab9ad;
+  border: 1px solid var(--line-strong);
   border-radius: 5px;
   padding: 7px 10px;
+}
+input,
+select {
+  min-height: 44px;
 }
 textarea {
   min-height: 76px;
