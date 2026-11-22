@@ -45,7 +45,7 @@ function featureHeading(kind, title, version) {
 function mainStory(item) {
   const target = directionLink(item.direction_id, item.snapshot_id);
   return (
-    '<article class="feature-story report-feature">' +
+    '<article class="card feature-story report-feature">' +
     featureHeading("重点变化", item.title) +
     '<div class="feature-content"><div class="story-body">' +
     prose(item.change) +
@@ -70,7 +70,7 @@ function mainStory(item) {
 }
 function featuredPaper(paper) {
   const quote = paper.evidence_ids?.[0];
-  return '<article class="feature-story report-feature">' +
+  return '<article class="card feature-story report-feature">' +
     featureHeading("重点阅读", paper.title, paper.version) +
     '<div class="feature-content">' + prose(shortFinding(paper.body)) +
     '<div class="story-actions"' + evidenceSet(paper.evidence_ids) + '><a class="button" href="' + paperUpdateUrl(paper) +

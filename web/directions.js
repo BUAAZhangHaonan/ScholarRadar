@@ -173,7 +173,7 @@ async function detail(id, sid) {
           prose(r.reasoning) + '</li>').join("") + '</ul></details>'
       : "") +
     "</section>" +
-    '<section class="feature-story direction-cut"><h2>可以推进的研究切口</h2><div class="story-body">' +
+    '<section class="card feature-story direction-cut"><h2>可以推进的研究切口</h2><div class="story-body">' +
     entry +
     "</div></section>" +
     (cur ? '<section id="prestudy" class="rule-section"></section>' : "") +

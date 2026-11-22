@@ -323,8 +323,7 @@ small,
   margin-top: 12px;
 }
 .card,
-.panel,
-.feature-story {
+.panel {
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: var(--pad);
@@ -340,8 +339,7 @@ small,
   margin-bottom: 8px;
 }
 .card h2,
-.panel h2,
-.feature-story h2 {
+.panel h2 {
   margin-bottom: 10px;
 }
 .report-feature {
