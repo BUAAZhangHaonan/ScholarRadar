@@ -117,26 +117,19 @@ async function detail(id, sid) {
           ? note(cur.open_issue)
           : "这个问题正在跟踪中，尚待形成有材料支撑的判断。",
       );
+  const requirements = terms([["开展条件", fit.needed], ["预计投入", fit.budget]]);
   const entry = supported
     ? prose(hypothesis.hypothesis || d.question) +
-      '<dl class="kv">' +
-      terms([
-        [
-          cur.edited_personal_connection ? "可复用" : "提案中的资产条件",
-          cur.personal_fit || fit.asset,
-        ],
-        ["开展条件", fit.needed],
-        ["预计投入", fit.budget],
-      ]) +
-      "</dl>" +
+      (cur.personal_fit || fit.asset
+        ? '<dl class="kv">' + terms([[cur.edited_personal_connection ? "个人切入点" : "提案中的资产条件",
+          cur.personal_fit || fit.asset]]) + '</dl>' : "") +
       (cur.next_step
-        ? '<div class="story-next">' + prose(cur.next_step) + "</div>"
-        : "") +
+        ? '<div class="story-next"><strong class="label">下一步</strong>' + prose(cur.next_step) + "</div>" : "") +
       (cur.action_id
-        ? '<div class="story-actions">' +
-          acceptControl(cur.action_id, cur.action_state) +
-          "</div>"
-        : "")
+        ? '<div class="story-actions">' + acceptControl(cur.action_id, cur.action_state) + "</div>" : "") +
+      (requirements
+        ? '<details class="cut-conditions"><summary>开展条件与预计投入</summary><dl class="kv">' +
+          requirements + '</dl></details>' : "")
     : prose(d.question === d.title ? d.method : d.question) + prose(d.setting);
   const methodology = supported
     ? terms([
@@ -180,7 +173,7 @@ async function detail(id, sid) {
           prose(r.reasoning) + '</li>').join("") + '</ul></details>'
       : "") +
     "</section>" +
-    '<section class="feature-story"><h2>可以推进的研究切口</h2><div class="story-body">' +
+    '<section class="feature-story direction-cut"><h2>可以推进的研究切口</h2><div class="story-body">' +
     entry +
     "</div></section>" +
     (cur ? '<section id="prestudy" class="rule-section"></section>' : "") +

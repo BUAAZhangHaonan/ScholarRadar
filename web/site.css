@@ -970,6 +970,12 @@ dialog > header {
 }
 .direction-reviewed .story-body { margin-top: 12px; }
 .direction-reviewed .story-next strong { display: block; margin-bottom: 3px; }
+.direction-cut { background: var(--card); }
+.direction-cut .kv { margin-block: 0; }
+.direction-cut .story-next .label { display: block; margin-bottom: 3px; }
+.direction-cut .story-actions { margin-top: 0; }
+.cut-conditions { border-top: 1px solid var(--line); }
+.cut-conditions summary { min-height: 44px; align-content: center; }
 .direction-fit summary { min-height: 44px; align-content: center; }
 .direction-fit[open] { padding-bottom: 6px; }
 .watch-directions { border-top: 1px solid var(--line); }
