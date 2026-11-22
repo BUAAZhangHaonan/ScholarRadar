@@ -4,22 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#fffef9" />
     <title>ScholarRadar · 研究工作台</title>
     <link rel="stylesheet" href="/static/site.css" />
   </head>
   <body>
+    <a class="skip-link" href="#app">跳到正文</a>
     <header class="mast">
       <div class="mast-inner">
-        <a class="brand" href="/"
-          ><i class="mark" aria-hidden="true"></i>ScholarRadar</a
-        >
-        <nav aria-label="研究工作台">
-          <a href="/">研究动态</a><a href="/directions">研究方向</a
-          ><a href="/tasks">研究任务</a><a href="/library">文献</a>
+        <a class="brand" href="/" aria-label="ScholarRadar 首页">
+          <i class="mark" aria-hidden="true"></i><span class="brand-word">ScholarRadar</span>
+        </a>
+        <nav class="main-nav" aria-label="研究工作台">
+          <a href="/" aria-label="研究动态"><span class="nav-prefix">研究</span>动态</a>
+          <a href="/directions" aria-label="研究方向"><span class="nav-prefix">研究</span>方向</a>
+          <a href="/tasks" aria-label="研究任务"><span class="nav-prefix">研究</span>任务</a>
+          <a href="/library">文献</a>
         </nav>
       </div>
     </header>
-    <main id="app" class="shell" aria-live="polite"></main>
+    <main id="app" class="shell" tabindex="-1" aria-live="polite"></main>
     <footer>
       <div class="foot-inner">
         <a href="/settings">个人设置</a><a href="/maintenance">运行维护</a>

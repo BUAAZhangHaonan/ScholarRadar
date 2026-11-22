@@ -14,6 +14,8 @@
   --line-strong: #93a399;
   --soft: #e7eee3;
   --focus: #a95b14;
+  --mast-height: 64px;
+  scroll-padding-block-start: calc(var(--mast-height) + 16px);
   --frame: 1120px;
   --gutter: 24px;
   --pad: 24px;
@@ -148,7 +150,21 @@ summary:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
+.skip-link {
+  position: fixed;
+  inset: 8px auto auto 12px;
+  z-index: 8;
+  padding: 8px 16px;
+  background: var(--card);
+  border: 1px solid var(--green);
+  border-radius: 6px;
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: translateY(0); }
 .mast {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   border-bottom: 1px solid var(--line);
   background: var(--card);
 }
@@ -161,58 +177,86 @@ summary:focus-visible {
   padding-inline: var(--gutter);
 }
 .mast-inner {
-  min-height: 68px;
+  min-height: var(--mast-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-}
-.brand {
-  color: var(--deep);
-  font-size: 23px;
-  line-height: 32px;
-  font-weight: 650;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-}
-.mark {
-  flex: 0 0 21px;
-  width: 21px;
-  height: 21px;
-  border: 1.4px solid var(--green);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 67% 35%, var(--green) 0 2.4px, transparent 2.8px),
-    radial-gradient(
-      circle,
-      transparent 0 4px,
-      #91b39a 4.4px 5.2px,
-      transparent 5.6px
-    );
-}
-nav[aria-label] {
-  display: flex;
-  align-items: stretch;
-  align-self: stretch;
-  flex-wrap: wrap;
   gap: 18px;
 }
-nav a {
+.brand {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--deep);
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 720;
+  text-decoration: none;
+}
+.brand-word { letter-spacing: -0.035em; }
+.mark {
+  position: relative;
+  flex: 0 0 31px;
+  width: 31px;
+  height: 31px;
+  border-radius: 8px;
+  background: var(--deep);
+}
+.mark::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid #b7d6c3;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 4px, #99baa7 4px 5px, transparent 5px);
+}
+.mark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(50% - 1px);
+  width: 10px;
+  height: 2px;
+  background: #e4f2be;
+  transform-origin: left center;
+  transform: rotate(-42deg);
+}
+.main-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.main-nav a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding-inline: 15px;
+  border-radius: 6px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 550;
-  padding-block: 8px;
   text-decoration: none;
-  border-bottom: 2px solid transparent;
+  white-space: nowrap;
 }
-nav a[aria-current] {
-  border-bottom-color: var(--green);
+.main-nav a:hover { background: var(--soft); }
+.main-nav a[aria-current="page"] {
   color: var(--deep);
+  background: var(--soft);
+  font-weight: 680;
 }
+.main-nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  bottom: 4px;
+  width: 12px;
+  height: 2px;
+  background: var(--green);
+}
+
 .shell {
   flex: 1 0 auto;
   padding-block: 30px 54px;
@@ -595,25 +639,12 @@ dialog > header {
     --gutter: 16px;
     --pad: 19px;
   }
-  .mast-inner {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 0 15px;
-    padding-top: 10px;
-  }
-  .mast-inner .brand {
-    margin-right: auto;
-  }
-  nav[aria-label] {
-    width: 100%;
-    gap: 14px;
-    align-self: auto;
-  }
-  nav a {
-    font-size: 13px;
-    min-height: 38px;
-    padding-block: 5px;
-  }
+  :root { --mast-height: 56px; }
+  .mast-inner { gap: 6px; }
+  .brand { font-size: 19px; gap: 7px; }
+  .main-nav { gap: 1px; }
+  .main-nav a { padding-inline: 6px; }
+  .main-nav .nav-prefix { display: none; }
   .shell {
     padding-block: 22px 40px;
   }
@@ -643,6 +674,10 @@ dialog > header {
   #evidence-drawer {
     width: 100%;
   }
+}
+@media (max-width: 360px) {
+  .mast .brand { min-width: 44px; }
+  .mast .brand-word { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   * {
