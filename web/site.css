@@ -824,6 +824,32 @@ dialog > header {
   font-size: 0.9em;
   overflow-wrap: anywhere;
 }
+.task-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px 32px;
+  padding-block: 17px;
+}
+.task-question { max-width: var(--measure); }
+.task-question h3 { margin-block: 4px; font-size: 18px; line-height: 28px; }
+.task-question h3 a { color: var(--ink); text-decoration: none; }
+.task-question h3 a:hover { color: var(--green); text-decoration: underline; }
+.task-parent { font-size: 14px; }
+.task-meta {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.task-meta time { font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) {
+  .task-list > li { grid-template-columns: minmax(0, 1fr); }
+  .task-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .task-parent { display: inline-flex; align-items: center; min-height: 44px; }
+}
 .origin-link { display: inline-block; padding-block: 5px; margin-top: 5px; font-size: 14px; }
 .stage-opening .prose + .prose { margin-top: 14px; }
 .stage-text > details {

@@ -54,6 +54,16 @@ async function detail(id) {
     }, 9000);
   }
 }
+function taskEntry(task) {
+  const stamp = task.updated_at || task.created_at;
+  return '<li><div class="task-question"><p class="label">' + stageName(task.stage) +
+    '</p><h3><a href="' + stagePath(task) + '">' + esc(task.focus || task.direction_title) +
+    '</a></h3><a class="task-parent" href="' + original(task) + '">' +
+    esc(task.direction_title || "回到研究方向") + '</a></div><div class="task-meta"><span>' +
+    esc(stageStatus(task)) + '</span>' +
+    (stamp ? '<time datetime="' + esc(stamp) + '">' + esc(humanDate(stamp)) + '</time>' : "") +
+    '</div></li>';
+}
 async function overview() {
   document.title = "研究任务 · ScholarRadar";
   $("#app").innerHTML =
@@ -64,32 +74,7 @@ async function overview() {
     try {
       const list = await api("/api/prestudies");
       target.innerHTML = list.length
-        ? '<ul class="list">' +
-          list
-            .map(
-              (t) =>
-                '<li><h3><a href="' +
-                stagePath(t) +
-                '">' +
-                esc(t.focus || t.direction_title) +
-                "</a></h3>" +
-                '<p class="sub">' +
-                esc(
-                  [
-                    stageName(t.stage),
-                    stageStatus(t),
-                    humanDate(t.updated_at || t.created_at),
-                  ].join(" · "),
-                ) +
-                "</p>" +
-                '<a href="' +
-                original(t) +
-                '">' +
-                esc(t.direction_title || "回到研究方向") +
-                "</a></li>",
-            )
-            .join("") +
-          "</ul>"
+        ? '<ul class="list task-list">' + list.map(taskEntry).join("") + '</ul>'
         : empty("还没有提交预研任务。") +
           '<a href="/directions">选择研究切口</a>';
       if (list.some(isActive))
